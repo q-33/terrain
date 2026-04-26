@@ -2,7 +2,9 @@ import { useRef, useState, useEffect } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { Color, Fog, Scene } from "three";
-import { OrbitControls as OrbitControlsImpl } from "three-stdlib";
+import { OrbitControls as OrbitControlsBase } from "three-stdlib";
+
+type OrbitControlsImpl = OrbitControlsBase & { rotateLeft: (angle: number) => void };
 import { earthStrategy, ALL_STRATEGIES, TerrainStrategy } from "./TerrainStrategy";
 import Terrain from "./Terrain";
 import KeyboardMovement from "./KeyboardMovement";
@@ -19,7 +21,7 @@ const fogNearFar = (
   return [near, far];
 };
 
-const App = (): JSX.Element => {
+const App = () => {
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const fogRef = useRef<Fog | null>(null);
   const sceneRef = useRef<Scene | null>(null);

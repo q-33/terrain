@@ -1,7 +1,9 @@
 import { useRef, useEffect, RefObject } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { OrbitControls as OrbitControlsImpl } from "three-stdlib";
+import { OrbitControls as OrbitControlsBase } from "three-stdlib";
+
+type OrbitControlsImpl = OrbitControlsBase & { rotateLeft: (angle: number) => void };
 import { KEYBOARD_MOVE_SPEED } from "./constants";
 
 type Props = {
