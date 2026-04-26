@@ -1,0 +1,152 @@
+import { useMemo, useRef } from "react";
+import * as THREE from "three";
+import { useFrame, useThree } from "@react-three/fiber";
+import {
+  WATER,
+  SAND,
+  GRASS,
+  ROCK,
+  SNOW,
+  TERRAIN_TILE_SIZE,
+  TERRAIN_SEGMENTS,
+  TERRAIN_HEIGHT_SCALE,
+  TERRAIN_REGEN_DISTANCE,
+  TERRAIN_SNAP_GRID,
+  TERRAIN_NOISE_FREQUENCY,
+  TERRAIN_NOISE_OCTAVES,
+  TERRAIN_NOISE_LACUNARITY,
+  TERRAIN_NOISE_GAIN,
+  BIOME_WATER_MAX_HEIGHT,
+  BIOME_SAND_MAX_HEIGHT,
+  BIOME_GRASS_MAX_HEIGHT,
+  BIOME_ROCK_MAX_HEIGHT,
+} from "./constants";
+import { fractalNoise } from "./noise";
+
+// Tile large enough that fog always hides the edge:
+// TERRAIN_TILE_SIZE/2 - TERRAIN_REGEN_DISTANCE > fog far  →  120 - 40 = 80 > 75 ✓
+const VERT_COUNT = TERRAIN_SEGMENTS * TERRAIN_SEGMENTS * 6; // 2 tris × 3 verts per quad
+
+const sampleTerrainHeight = (worldX: number, worldZ: number): number =>
+  fractalNoise(
+    worldX * TERRAIN_NOISE_FREQUENCY,
+    worldZ * TERRAIN_NOISE_FREQUENCY,
+    TERRAIN_NOISE_OCTAVES,
+    TERRAIN_NOISE_LACUNARITY,
+    TERRAIN_NOISE_GAIN,
+  ) * TERRAIN_HEIGHT_SCALE;
+
+const heightToColor = (height: number): [number, number, number] => {
+  if (height < BIOME_WATER_MAX_HEIGHT) { return WATER; }
+  if (height < BIOME_SAND_MAX_HEIGHT) { return SAND; }
+  if (height < BIOME_GRASS_MAX_HEIGHT) { return GRASS; }
+  if (height < BIOME_ROCK_MAX_HEIGHT) { return ROCK; }
+  return SNOW;
+};
+
+// Writes a single vertex (position + color) into the flat buffer arrays at slot i.
+const writeVertex = (
+  positions: Float32Array,
+  colors: Float32Array,
+  i: number,
+  x: number,
+  y: number,
+  z: number,
+  color: [number, number, number],
+): void => {
+  positions[i * 3] = x;
+  positions[i * 3 + 1] = y;
+  positions[i * 3 + 2] = z;
+  colors[i * 3] = color[0];
+  colors[i * 3 + 1] = color[1];
+  colors[i * 3 + 2] = color[2];
+};
+
+// Samples height at all four corners of each quad, then writes two triangles
+// (CCW winding from above so normals point up) with flat per-face colors into
+// the pre-allocated position and color GPU buffers.
+const populateTerrainBuffers = (
+  positions: Float32Array,
+  colors: Float32Array,
+  centerX: number,
+  centerZ: number,
+): void => {
+  const quadSize = TERRAIN_TILE_SIZE / TERRAIN_SEGMENTS;
+  const originX = centerX - TERRAIN_TILE_SIZE / 2;
+  const originZ = centerZ - TERRAIN_TILE_SIZE / 2;
+  let vertexIndex = 0;
+
+  for (let row = 0; row < TERRAIN_SEGMENTS; row++) {
+    for (let col = 0; col < TERRAIN_SEGMENTS; col++) {
+      const x0 = originX + col * quadSize;
+      const z0 = originZ + row * quadSize;
+      const x1 = x0 + quadSize;
+      const z1 = z0 + quadSize;
+
+      const h00 = sampleTerrainHeight(x0, z0);
+      const h10 = sampleTerrainHeight(x1, z0);
+      const h01 = sampleTerrainHeight(x0, z1);
+      const h11 = sampleTerrainHeight(x1, z1);
+
+      const colorTri1 = heightToColor((h00 + h10 + h01) / 3);
+      const colorTri2 = heightToColor((h10 + h11 + h01) / 3);
+
+      // Triangle 1: top-left, bottom-left, top-right
+      writeVertex(positions, colors, vertexIndex++, x0, h00, z0, colorTri1);
+      writeVertex(positions, colors, vertexIndex++, x0, h01, z1, colorTri1);
+      writeVertex(positions, colors, vertexIndex++, x1, h10, z0, colorTri1);
+
+      // Triangle 2: top-right, bottom-left, bottom-right
+      writeVertex(positions, colors, vertexIndex++, x1, h10, z0, colorTri2);
+      writeVertex(positions, colors, vertexIndex++, x0, h01, z1, colorTri2);
+      writeVertex(positions, colors, vertexIndex++, x1, h11, z1, colorTri2);
+    }
+  }
+};
+
+const Terrain = (): JSX.Element => {
+  const { camera } = useThree();
+  const center = useRef(new THREE.Vector2(0, 0));
+
+  const geo = useMemo(() => {
+    const g = new THREE.BufferGeometry();
+    const positions = new Float32Array(VERT_COUNT * 3);
+    const colors = new Float32Array(VERT_COUNT * 3);
+    populateTerrainBuffers(positions, colors, 0, 0);
+    g.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    g.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    g.computeVertexNormals();
+    return g;
+  }, []);
+
+  useFrame(() => {
+    const cx = camera.position.x;
+    const cz = camera.position.z;
+    const dx = cx - center.current.x;
+    const dz = cz - center.current.y;
+    if (dx * dx + dz * dz < TERRAIN_REGEN_DISTANCE * TERRAIN_REGEN_DISTANCE) {
+      return;
+    }
+
+    // Snap to grid so the pop happens less often and never overlaps fog
+    const snappedX = Math.round(cx / TERRAIN_SNAP_GRID) * TERRAIN_SNAP_GRID;
+    const snappedZ = Math.round(cz / TERRAIN_SNAP_GRID) * TERRAIN_SNAP_GRID;
+    center.current.set(snappedX, snappedZ);
+
+    const positions = geo.attributes.position.array as Float32Array;
+    const colors = geo.attributes.color.array as Float32Array;
+    populateTerrainBuffers(positions, colors, snappedX, snappedZ);
+    geo.attributes.position.needsUpdate = true;
+    geo.attributes.color.needsUpdate = true;
+    geo.computeVertexNormals();
+    geo.computeBoundingSphere();
+  });
+
+  return (
+    <mesh geometry={geo}>
+      <meshLambertMaterial vertexColors flatShading />
+    </mesh>
+  );
+};
+
+export default Terrain;
