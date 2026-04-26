@@ -1,9 +1,9 @@
 import { useRef, useState, useEffect } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
-import { Color, Fog } from "three";
+import { Color, Fog, Scene } from "three";
 import { OrbitControls as OrbitControlsImpl } from "three-stdlib";
-import { SKY } from "./constants";
+import { earthStrategy, ALL_STRATEGIES, TerrainStrategy } from "./TerrainStrategy";
 import Terrain from "./Terrain";
 import KeyboardMovement from "./KeyboardMovement";
 import SettingsPanel from "./SettingsPanel";
@@ -19,11 +19,13 @@ const fogNearFar = (
   return [near, far];
 };
 
-const App = () => {
+const App = (): JSX.Element => {
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const fogRef = useRef<Fog | null>(null);
-  const [fogDensity, setFogDensity] = useState(50);
-  const [viewDistance, setViewDistance] = useState(50);
+  const sceneRef = useRef<Scene | null>(null);
+  const [fogDensity, setFogDensity] = useState(earthStrategy.defaultFogDensity);
+  const [viewDistance, setViewDistance] = useState(earthStrategy.defaultViewDistance);
+  const [strategy, setStrategy] = useState<TerrainStrategy>(earthStrategy);
 
   useEffect(() => {
     if (!fogRef.current) {
@@ -34,15 +36,27 @@ const App = () => {
     fogRef.current.far = far;
   }, [fogDensity, viewDistance]);
 
+  useEffect(() => {
+    if (sceneRef.current) {
+      (sceneRef.current.background as Color).set(strategy.skyColor);
+    }
+    if (fogRef.current) {
+      fogRef.current.color.set(strategy.fogColor);
+    }
+    setFogDensity(strategy.defaultFogDensity);
+    setViewDistance(strategy.defaultViewDistance);
+  }, [strategy]);
+
   return (
     <>
       <Canvas
         camera={{ fov: 60, near: 0.1, far: 300, position: [0, 22, 28] }}
         gl={{ antialias: true }}
         onCreated={({ scene }) => {
-          scene.background = new Color(SKY);
+          sceneRef.current = scene;
+          scene.background = new Color(strategy.skyColor);
           const [near, far] = fogNearFar(fogDensity, viewDistance);
-          const fog = new Fog(SKY, near, far);
+          const fog = new Fog(strategy.fogColor, near, far);
           scene.fog = fog;
           fogRef.current = fog;
         }}
@@ -61,7 +75,7 @@ const App = () => {
           maxPolarAngle={Math.PI / 2.2}
         />
         <KeyboardMovement controlsRef={controlsRef} />
-        <Terrain />
+        <Terrain strategy={strategy} />
       </Canvas>
 
       <div
@@ -90,6 +104,9 @@ const App = () => {
         onFogDensity={setFogDensity}
         viewDistance={viewDistance}
         onViewDistance={setViewDistance}
+        strategy={strategy}
+        onStrategy={setStrategy}
+        strategies={ALL_STRATEGIES}
       />
     </>
   );

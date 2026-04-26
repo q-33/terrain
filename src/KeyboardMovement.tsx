@@ -4,9 +4,9 @@ import * as THREE from "three";
 import { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { KEYBOARD_MOVE_SPEED } from "./constants";
 
-interface Props {
+type Props = {
   controlsRef: RefObject<OrbitControlsImpl | null>;
-}
+};
 
 const KeyboardMovement = ({ controlsRef }: Props): null => {
   const { camera } = useThree();

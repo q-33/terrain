@@ -1,0 +1,83 @@
+export type TerrainStrategy = {
+  name: string;
+  skyColor: string;
+  fogColor: string;
+  defaultFogDensity: number;
+  defaultViewDistance: number;
+  colorForHeight: (height: number) => [number, number, number];
+};
+
+export const earthStrategy: TerrainStrategy = {
+  name: "Earth",
+  skyColor: "#8fb4c8",
+  fogColor: "#8fb4c8",
+  defaultFogDensity: 50,
+  defaultViewDistance: 50,
+  colorForHeight: (h) => {
+    if (h < -1.5) {
+      return [0.18, 0.35, 0.56]; // deep water
+    }
+    if (h < 0.5) {
+      return [0.76, 0.66, 0.42]; // sand
+    }
+    if (h < 5.0) {
+      return [0.29, 0.49, 0.35]; // grass
+    }
+    if (h < 9.0) {
+      return [0.42, 0.36, 0.31]; // rock
+    }
+    return [0.85, 0.90, 0.90]; // snow
+  },
+};
+
+export const marsStrategy: TerrainStrategy = {
+  name: "Mars",
+  skyColor: "#b5581a",
+  fogColor: "#c27040",
+  defaultFogDensity: 65,
+  defaultViewDistance: 35,
+  colorForHeight: (h) => {
+    if (h < -4.0) {
+      return [0.20, 0.08, 0.06]; // crater floor
+    }
+    if (h < 0.0) {
+      return [0.50, 0.20, 0.11]; // rusty lowlands
+    }
+    if (h < 4.0) {
+      return [0.62, 0.32, 0.16]; // ochre plains
+    }
+    if (h < 7.5) {
+      return [0.70, 0.46, 0.30]; // dusty highlands
+    }
+    return [0.80, 0.66, 0.58]; // pale summit
+  },
+};
+
+export const oceanFloorStrategy: TerrainStrategy = {
+  name: "Ocean Floor",
+  skyColor: "#060e1c",
+  fogColor: "#07111f",
+  defaultFogDensity: 75,
+  defaultViewDistance: 25,
+  colorForHeight: (h) => {
+    if (h < -5.0) {
+      return [0.04, 0.04, 0.08]; // hadal trench
+    }
+    if (h < -1.5) {
+      return [0.07, 0.10, 0.18]; // abyssal plain
+    }
+    if (h < 2.0) {
+      return [0.15, 0.19, 0.28]; // continental slope
+    }
+    if (h < 6.0) {
+      return [0.26, 0.24, 0.23]; // seamount basalt
+    }
+    return [0.62, 0.52, 0.32]; // hydrothermal minerals
+  },
+};
+
+export const ALL_STRATEGIES: readonly TerrainStrategy[] = [
+  earthStrategy,
+  marsStrategy,
+  oceanFloorStrategy,
+];

@@ -1,9 +1,14 @@
-interface Props {
+import { TerrainStrategy } from "./TerrainStrategy";
+
+type Props = {
   fogDensity: number;
   onFogDensity: (v: number) => void;
   viewDistance: number;
   onViewDistance: (v: number) => void;
-}
+  strategy: TerrainStrategy;
+  onStrategy: (s: TerrainStrategy) => void;
+  strategies: readonly TerrainStrategy[];
+};
 
 const Slider = ({
   label,
@@ -35,6 +40,9 @@ const SettingsPanel = ({
   onFogDensity,
   viewDistance,
   onViewDistance,
+  strategy,
+  onStrategy,
+  strategies,
 }: Props): JSX.Element => (
   <div
     style={{
@@ -51,7 +59,7 @@ const SettingsPanel = ({
       fontSize: 12,
       display: "flex",
       flexDirection: "column",
-      gap: 8,
+      gap: 10,
       minWidth: 180,
       userSelect: "none",
     }}
@@ -67,12 +75,34 @@ const SettingsPanel = ({
       SETTINGS
     </div>
 
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <span style={{ opacity: 0.7 }}>Terrain</span>
+      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+        {strategies.map((s) => (
+          <button
+            key={s.name}
+            onClick={() => onStrategy(s)}
+            style={{
+              flex: 1,
+              padding: "4px 6px",
+              fontSize: 11,
+              fontFamily: "monospace",
+              cursor: "pointer",
+              borderRadius: 5,
+              border: "1px solid rgba(255,255,255,0.2)",
+              background: s === strategy ? "rgba(255,255,255,0.2)" : "transparent",
+              color: s === strategy ? "#fff" : "rgba(255,255,255,0.55)",
+              transition: "background 0.15s, color 0.15s",
+            }}
+          >
+            {s.name}
+          </button>
+        ))}
+      </div>
+    </div>
+
     <Slider label="Fog density" value={fogDensity} onChange={onFogDensity} />
-    <Slider
-      label="View distance"
-      value={viewDistance}
-      onChange={onViewDistance}
-    />
+    <Slider label="View distance" value={viewDistance} onChange={onViewDistance} />
   </div>
 );
 

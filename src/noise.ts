@@ -1,63 +1,59 @@
-const perm = new Uint8Array(512);
-const grad3: [number, number, number][] = [
-  [1, 1, 0],
-  [-1, 1, 0],
-  [1, -1, 0],
-  [-1, -1, 0],
-  [1, 0, 1],
-  [-1, 0, 1],
-  [1, 0, -1],
-  [-1, 0, -1],
-  [0, 1, 1],
-  [0, -1, 1],
-  [0, 1, -1],
-  [0, -1, -1],
+// Lookup table mapping permutation indices to gradient vectors for Perlin noise.
+// 12 vectors point toward the edges/vertices of a cube, giving uniform gradient distribution.
+const gradients: [number, number, number][] = [
+  [1, 1, 0], [-1, 1, 0], [1, -1, 0], [-1, -1, 0],
+  [1, 0, 1], [-1, 0, 1], [1, 0, -1], [-1, 0, -1],
+  [0, 1, 1], [0, -1, 1], [0, 1, -1], [0, -1, -1],
 ];
 
-const buildPerm = (seed = 42): void => {
-  const p = new Uint8Array(256);
+// Doubled permutation table (512 entries) to avoid index wrapping in lookups.
+const permutationTable = new Uint8Array(512);
+
+const buildPermutationTable = (seed = 42): void => {
+  const shuffled = new Uint8Array(256);
   for (let i = 0; i < 256; i++) {
-    p[i] = i;
+    shuffled[i] = i;
   }
-  let s = seed;
+  // Fisher-Yates shuffle using a linear congruential generator for the seed.
+  let state = seed;
   for (let i = 255; i > 0; i--) {
-    s = (s * 1664525 + 1013904223) >>> 0;
-    const j = s % (i + 1);
-    [p[i], p[j]] = [p[j], p[i]];
+    state = (state * 1664525 + 1013904223) >>> 0;
+    const swapTarget = state % (i + 1);
+    [shuffled[i], shuffled[swapTarget]] = [shuffled[swapTarget], shuffled[i]];
   }
   for (let i = 0; i < 512; i++) {
-    perm[i] = p[i & 255];
+    permutationTable[i] = shuffled[i & 255];
   }
 };
 
-buildPerm();
+buildPermutationTable();
 
-const dot = (g: [number, number, number], x: number, y: number): number =>
-  g[0] * x + g[1] * y;
+const dotWithGradient = (gradient: [number, number, number], x: number, y: number): number =>
+  gradient[0] * x + gradient[1] * y;
 
-const fade = (t: number): number => t * t * t * (t * (t * 6 - 15) + 10);
+// Ken Perlin's quintic fade curve: smoothstep that has zero first and second derivatives at t=0,1.
+const quinticFade = (t: number): number => t * t * t * (t * (t * 6 - 15) + 10);
 
-const lerp = (a: number, b: number, t: number): number => a + t * (b - a);
+const linearInterpolate = (a: number, b: number, t: number): number => a + t * (b - a);
 
 export const perlin = (x: number, y: number): number => {
-  const X = Math.floor(x) & 255;
-  const Y = Math.floor(y) & 255;
-  const xf = x - Math.floor(x);
-  const yf = y - Math.floor(y);
-  const u = fade(xf);
-  const v = fade(yf);
-  const aa = perm[perm[X] + Y];
-  const ab = perm[perm[X] + Y + 1];
-  const ba = perm[perm[X + 1] + Y];
-  const bb = perm[perm[X + 1] + Y + 1];
-  return lerp(
-    lerp(dot(grad3[aa % 12], xf, yf), dot(grad3[ba % 12], xf - 1, yf), u),
-    lerp(
-      dot(grad3[ab % 12], xf, yf - 1),
-      dot(grad3[bb % 12], xf - 1, yf - 1),
-      u,
-    ),
-    v,
+  const cellX = Math.floor(x) & 255;
+  const cellY = Math.floor(y) & 255;
+  const localX = x - Math.floor(x);
+  const localY = y - Math.floor(y);
+  const fadeX = quinticFade(localX);
+  const fadeY = quinticFade(localY);
+
+  // Hash the four corners of the unit square to gradient indices.
+  const g00 = permutationTable[permutationTable[cellX]     + cellY];
+  const g01 = permutationTable[permutationTable[cellX]     + cellY + 1];
+  const g10 = permutationTable[permutationTable[cellX + 1] + cellY];
+  const g11 = permutationTable[permutationTable[cellX + 1] + cellY + 1];
+
+  return linearInterpolate(
+    linearInterpolate(dotWithGradient(gradients[g00 % 12], localX,     localY),     dotWithGradient(gradients[g10 % 12], localX - 1, localY),     fadeX),
+    linearInterpolate(dotWithGradient(gradients[g01 % 12], localX,     localY - 1), dotWithGradient(gradients[g11 % 12], localX - 1, localY - 1), fadeX),
+    fadeY,
   );
 };
 
@@ -68,15 +64,15 @@ export const fractalNoise = (
   lacunarity = 2.0,
   gain = 0.5,
 ): number => {
-  let value = 0;
+  let total = 0;
   let amplitude = 1;
   let frequency = 1;
-  let max = 0;
+  let normalisationSum = 0;
   for (let i = 0; i < octaves; i++) {
-    value += perlin(x * frequency, y * frequency) * amplitude;
-    max += amplitude;
+    total += perlin(x * frequency, y * frequency) * amplitude;
+    normalisationSum += amplitude;
     amplitude *= gain;
     frequency *= lacunarity;
   }
-  return value / max;
+  return total / normalisationSum;
 };

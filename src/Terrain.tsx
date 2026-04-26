@@ -1,12 +1,7 @@
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useEffect } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import {
-  WATER,
-  SAND,
-  GRASS,
-  ROCK,
-  SNOW,
   TERRAIN_TILE_SIZE,
   TERRAIN_SEGMENTS,
   TERRAIN_HEIGHT_SCALE,
@@ -16,12 +11,9 @@ import {
   TERRAIN_NOISE_OCTAVES,
   TERRAIN_NOISE_LACUNARITY,
   TERRAIN_NOISE_GAIN,
-  BIOME_WATER_MAX_HEIGHT,
-  BIOME_SAND_MAX_HEIGHT,
-  BIOME_GRASS_MAX_HEIGHT,
-  BIOME_ROCK_MAX_HEIGHT,
 } from "./constants";
 import { fractalNoise } from "./noise";
+import { TerrainStrategy } from "./TerrainStrategy";
 
 // Tile large enough that fog always hides the edge:
 // TERRAIN_TILE_SIZE/2 - TERRAIN_REGEN_DISTANCE > fog far  →  120 - 40 = 80 > 75 ✓
@@ -35,14 +27,6 @@ const sampleTerrainHeight = (worldX: number, worldZ: number): number =>
     TERRAIN_NOISE_LACUNARITY,
     TERRAIN_NOISE_GAIN,
   ) * TERRAIN_HEIGHT_SCALE;
-
-const heightToColor = (height: number): [number, number, number] => {
-  if (height < BIOME_WATER_MAX_HEIGHT) { return WATER; }
-  if (height < BIOME_SAND_MAX_HEIGHT) { return SAND; }
-  if (height < BIOME_GRASS_MAX_HEIGHT) { return GRASS; }
-  if (height < BIOME_ROCK_MAX_HEIGHT) { return ROCK; }
-  return SNOW;
-};
 
 // Writes a single vertex (position + color) into the flat buffer arrays at slot i.
 const writeVertex = (
@@ -70,6 +54,7 @@ const populateTerrainBuffers = (
   colors: Float32Array,
   centerX: number,
   centerZ: number,
+  strategy: TerrainStrategy,
 ): void => {
   const quadSize = TERRAIN_TILE_SIZE / TERRAIN_SEGMENTS;
   const originX = centerX - TERRAIN_TILE_SIZE / 2;
@@ -88,8 +73,8 @@ const populateTerrainBuffers = (
       const h01 = sampleTerrainHeight(x0, z1);
       const h11 = sampleTerrainHeight(x1, z1);
 
-      const colorTri1 = heightToColor((h00 + h10 + h01) / 3);
-      const colorTri2 = heightToColor((h10 + h11 + h01) / 3);
+      const colorTri1 = strategy.colorForHeight((h00 + h10 + h01) / 3);
+      const colorTri2 = strategy.colorForHeight((h10 + h11 + h01) / 3);
 
       // Triangle 1: top-left, bottom-left, top-right
       writeVertex(positions, colors, vertexIndex++, x0, h00, z0, colorTri1);
@@ -104,20 +89,34 @@ const populateTerrainBuffers = (
   }
 };
 
-const Terrain = (): JSX.Element => {
+type Props = {
+  strategy: TerrainStrategy;
+};
+
+const Terrain = ({ strategy }: Props): JSX.Element => {
   const { camera } = useThree();
   const center = useRef(new THREE.Vector2(0, 0));
+  const strategyRef = useRef(strategy);
 
   const geo = useMemo(() => {
     const g = new THREE.BufferGeometry();
     const positions = new Float32Array(VERT_COUNT * 3);
     const colors = new Float32Array(VERT_COUNT * 3);
-    populateTerrainBuffers(positions, colors, 0, 0);
+    populateTerrainBuffers(positions, colors, 0, 0, strategyRef.current);
     g.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     g.setAttribute("color", new THREE.BufferAttribute(colors, 3));
     g.computeVertexNormals();
     return g;
   }, []);
+
+  // When strategy changes, repopulate only colors — positions are unchanged.
+  useEffect(() => {
+    strategyRef.current = strategy;
+    const positions = geo.attributes.position.array as Float32Array;
+    const colors = geo.attributes.color.array as Float32Array;
+    populateTerrainBuffers(positions, colors, center.current.x, center.current.y, strategy);
+    geo.attributes.color.needsUpdate = true;
+  }, [strategy, geo]);
 
   useFrame(() => {
     const cx = camera.position.x;
@@ -135,7 +134,7 @@ const Terrain = (): JSX.Element => {
 
     const positions = geo.attributes.position.array as Float32Array;
     const colors = geo.attributes.color.array as Float32Array;
-    populateTerrainBuffers(positions, colors, snappedX, snappedZ);
+    populateTerrainBuffers(positions, colors, snappedX, snappedZ, strategyRef.current);
     geo.attributes.position.needsUpdate = true;
     geo.attributes.color.needsUpdate = true;
     geo.computeVertexNormals();
