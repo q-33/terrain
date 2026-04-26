@@ -89,11 +89,11 @@ const populateTerrainBuffers = (
   }
 };
 
-type Props = {
+type TerrainProps = {
   strategy: TerrainStrategy;
 };
 
-const Terrain = ({ strategy }: Props): JSX.Element => {
+const Terrain = ({ strategy }: TerrainProps) => {
   const { camera } = useThree();
   const center = useRef(new THREE.Vector2(0, 0));
   const strategyRef = useRef(strategy);

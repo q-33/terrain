@@ -18,7 +18,7 @@ const Slider = ({
   label: string;
   value: number;
   onChange: (v: number) => void;
-}): JSX.Element => (
+}) => (
   <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
     <div style={{ display: "flex", justifyContent: "space-between" }}>
       <span>{label}</span>
@@ -43,7 +43,7 @@ const SettingsPanel = ({
   strategy,
   onStrategy,
   strategies,
-}: Props): JSX.Element => (
+}: Props) => (
   <div
     style={{
       position: "fixed",
