@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create *)",
+      "Read(//usr/local/bin/**)",
+      "Read(//Users/ourizon/.volta/**)",
+      "Bash(command -v node npm bun pnpm)",
+      "Bash(export PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\")",
+      "Bash(export PATH=\"/opt/homebrew/bin:$PATH\")",
+      "Bash(npm --version)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(curl -s http://localhost:5173)",
+      "WebFetch(domain:codesandbox.io)"
+    ]
+  }
+}
