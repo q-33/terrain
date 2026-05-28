@@ -6,6 +6,8 @@ export type TerrainStrategy = {
   fogColor: string;
   defaultFogDensity: number;
   defaultViewDistance: number;
+  roughness: number;
+  metalness: number;
   colorForHeight: (height: number) => RGB;
 };
 
@@ -15,6 +17,8 @@ export const earthStrategy: TerrainStrategy = {
   fogColor: "#8fb4c8",
   defaultFogDensity: 50,
   defaultViewDistance: 50,
+  roughness: 0.85,
+  metalness: 0.0,
   colorForHeight: (h) => {
     if (h < -1.5) {
       return [0.18, 0.35, 0.56]; // deep water
@@ -38,6 +42,8 @@ export const marsStrategy: TerrainStrategy = {
   fogColor: "#c27040",
   defaultFogDensity: 65,
   defaultViewDistance: 35,
+  roughness: 0.95,
+  metalness: 0.0,
   colorForHeight: (h) => {
     if (h < -4.0) {
       return [0.2, 0.08, 0.06]; // crater floor
@@ -61,6 +67,8 @@ export const oceanFloorStrategy: TerrainStrategy = {
   fogColor: "#07111f",
   defaultFogDensity: 75,
   defaultViewDistance: 25,
+  roughness: 0.4,
+  metalness: 0.15,
   colorForHeight: (h) => {
     if (h < -5.0) {
       return [0.04, 0.04, 0.08]; // hadal trench

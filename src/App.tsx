@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, Suspense } from "react";
+import { useThree } from "@react-three/fiber";
 import { Routes, Route, useNavigate } from "react-router-dom";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
@@ -99,6 +100,21 @@ export const SelectField = ({
     <span style={SELECT_ARROW_STYLE}>▾</span>
   </div>
 );
+
+// OrbitControls always calls preventDefault() on contextmenu, suppressing the
+// browser's right-click menu. Intercept in capture phase before it can, and
+// call stopImmediatePropagation() so OrbitControls' listener never fires.
+const AllowContextMenu = () => {
+  const { gl } = useThree();
+  useEffect(() => {
+    const el = gl.domElement;
+    const handler = (e: Event) => e.stopImmediatePropagation();
+    el.addEventListener("contextmenu", handler, { capture: true });
+    return () =>
+      el.removeEventListener("contextmenu", handler, { capture: true });
+  }, [gl]);
+  return null;
+};
 
 const App = () => {
   const [characterId, setCharacterId] = useState<CharacterId>("builtin");
@@ -212,6 +228,7 @@ const TerrainView = ({ characterId, onCharacterChange }: TerrainViewProps) => {
           fogRef.current = fog;
         }}
       >
+        <AllowContextMenu />
         <ambientLight intensity={0.45} />
         <directionalLight position={[60, 80, 40]} intensity={1.6} />
         <hemisphereLight args={["#a8d0e6", "#6b8e4e", 0.5]} />
@@ -225,6 +242,7 @@ const TerrainView = ({ characterId, onCharacterChange }: TerrainViewProps) => {
           minPolarAngle={ORBIT_MIN_POLAR_ANGLE}
           maxPolarAngle={ORBIT_MAX_POLAR_ANGLE}
           enableKeys={false}
+          enablePan={false}
         />
         <GizmoMovement
           controlsRef={controlsRef}

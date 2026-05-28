@@ -75,8 +75,24 @@ const populateTerrainBuffers = (
       const h01 = sampleTerrainHeight(x0, z1);
       const h11 = sampleTerrainHeight(x1, z1);
 
-      const colorTri1 = strategy.colorForHeight((h00 + h10 + h01) / 3);
-      const colorTri2 = strategy.colorForHeight((h10 + h11 + h01) / 3);
+      // Darken steep faces to give a textured relief effect
+      const slope1 = Math.min(
+        1,
+        (Math.abs(h10 - h00) + Math.abs(h01 - h00)) * 0.1,
+      );
+      const slope2 = Math.min(
+        1,
+        (Math.abs(h11 - h10) + Math.abs(h11 - h01)) * 0.1,
+      );
+      const dim = (c: RGB, t: number): RGB => [c[0] * t, c[1] * t, c[2] * t];
+      const colorTri1 = dim(
+        strategy.colorForHeight((h00 + h10 + h01) / 3),
+        1 - slope1 * 0.3,
+      );
+      const colorTri2 = dim(
+        strategy.colorForHeight((h10 + h11 + h01) / 3),
+        1 - slope2 * 0.3,
+      );
 
       // Triangle 1: top-left, bottom-left, top-right
       writeVertex(positions, colors, vertexIndex++, x0, h00, z0, colorTri1);
@@ -157,7 +173,12 @@ const Terrain = ({ strategy }: TerrainProps) => {
 
   return (
     <mesh geometry={geo}>
-      <meshLambertMaterial vertexColors flatShading />
+      <meshStandardMaterial
+        vertexColors
+        flatShading
+        roughness={strategy.roughness}
+        metalness={strategy.metalness}
+      />
     </mesh>
   );
 };

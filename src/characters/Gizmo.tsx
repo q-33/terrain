@@ -214,8 +214,12 @@ const Gizmo = forwardRef<THREE.Group, Props>(
               <meshLambertMaterial color={SNOUT_GREY} />
             </mesh>
 
-            <mesh name="nose" position={[0, 0.97, 0.83]}>
-              <sphereGeometry args={[0.026, 8, 6]} />
+            <mesh
+              name="nose"
+              position={[0, 0.97, 0.83]}
+              scale={[1, 0.72, 0.58]}
+            >
+              <dodecahedronGeometry args={[0.034, 0]} />
               <meshLambertMaterial color={NOSE_DARK} />
             </mesh>
 
@@ -266,28 +270,28 @@ const Gizmo = forwardRef<THREE.Group, Props>(
           </group>
 
           <LegGroup
-            position={[-0.21, 0.42, 0.27]}
+            position={[-0.24, 0.42, 0.38]}
             phaseOffset={0}
             walkPhaseRef={walkPhaseRef}
             movingRef={movingRef}
             jumpingRef={jumpingRef}
           />
           <LegGroup
-            position={[0.21, 0.42, 0.27]}
+            position={[0.24, 0.42, 0.38]}
             phaseOffset={Math.PI}
             walkPhaseRef={walkPhaseRef}
             movingRef={movingRef}
             jumpingRef={jumpingRef}
           />
           <LegGroup
-            position={[-0.2, 0.38, -0.22]}
+            position={[-0.24, 0.38, -0.32]}
             phaseOffset={Math.PI}
             walkPhaseRef={walkPhaseRef}
             movingRef={movingRef}
             jumpingRef={jumpingRef}
           />
           <LegGroup
-            position={[0.2, 0.38, -0.22]}
+            position={[0.24, 0.38, -0.32]}
             phaseOffset={0}
             walkPhaseRef={walkPhaseRef}
             movingRef={movingRef}
