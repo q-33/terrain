@@ -1,6 +1,8 @@
+import { Vec3 } from "./types";
+
 // Lookup table mapping permutation indices to gradient vectors for Perlin noise.
 // 12 vectors point toward the edges/vertices of a cube, giving uniform gradient distribution.
-const gradients: [number, number, number][] = [
+const gradients: Vec3[] = [
   [1, 1, 0],
   [-1, 1, 0],
   [1, -1, 0],
@@ -37,11 +39,8 @@ const buildPermutationTable = (seed = 42): void => {
 
 buildPermutationTable();
 
-const dotWithGradient = (
-  gradient: [number, number, number],
-  x: number,
-  y: number,
-): number => gradient[0] * x + gradient[1] * y;
+const dotWithGradient = (gradient: Vec3, x: number, y: number): number =>
+  gradient[0] * x + gradient[1] * y;
 
 // Ken Perlin's quintic fade curve: smoothstep that has zero first and second derivatives at t=0,1.
 const quinticFade = (t: number): number => t * t * t * (t * (t * 6 - 15) + 10);

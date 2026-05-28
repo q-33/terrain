@@ -1,10 +1,12 @@
 import { forwardRef, useRef, RefObject } from "react";
+import { Vec3 } from "../types";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 
-const WALK_PHASE_SPEED = 9;
-const WALK_LEG_SWING = 0.38;
-const WALK_BOB_AMOUNT = 0.022;
+const WALK_PHASE_SPEED = 16;
+const WALK_LEG_SWING = 0.7;
+const WALK_BOB_AMOUNT = 0.06;
+const WALK_ROLL_AMOUNT = 0.12;
 const JUMP_LEG_TUCK = 0.9;
 const JUMP_LEG_TUCK_SPEED = 0.18;
 const LEG_RETURN_SPEED = 0.3;
@@ -12,6 +14,8 @@ const LEG_RETURN_SPEED = 0.3;
 const FUR_CREAM = "#e8dcc8";
 const FUR_LIGHT = "#f0e8d8";
 const FUR_TAN = "#c8b490";
+const FUR_GOLDEN = "#c8922a";
+const PAW_DARK = "#2a1a12";
 const SNOUT_GREY = "#b8b0a8";
 const EYE_DARK = "#100805";
 const NOSE_DARK = "#e8829a";
@@ -30,7 +34,7 @@ const LegGroup = ({
   movingRef,
   jumpingRef,
 }: {
-  position: [number, number, number];
+  position: Vec3;
   phaseOffset: number;
   walkPhaseRef: RefObject<number>;
   movingRef: RefObject<boolean>;
@@ -63,7 +67,7 @@ const LegGroup = ({
       </mesh>
       <mesh position={[0, -0.44, 0]} scale={[1, 0.65, 1.1]}>
         <sphereGeometry args={[0.09, 8, 6]} />
-        <meshLambertMaterial color={FUR_TAN} />
+        <meshLambertMaterial color={PAW_DARK} />
       </mesh>
     </group>
   );
@@ -87,6 +91,8 @@ const Gizmo = forwardRef<THREE.Group, Props>(
             (1.18 - bodyGroupRef.current.scale.y) * 0.15;
           bodyGroupRef.current.scale.x +=
             (0.88 - bodyGroupRef.current.scale.x) * 0.15;
+          bodyGroupRef.current.rotation.z +=
+            (0 - bodyGroupRef.current.rotation.z) * 0.15;
         } else {
           bodyGroupRef.current.scale.y +=
             (1 - bodyGroupRef.current.scale.y) * 0.2;
@@ -96,160 +102,198 @@ const Gizmo = forwardRef<THREE.Group, Props>(
             ? WALK_BOB_AMOUNT * Math.abs(Math.sin(walkPhaseRef.current))
             : 0;
           bodyGroupRef.current.position.y = bob;
+          const roll = movingRef.current
+            ? WALK_ROLL_AMOUNT * Math.sin(walkPhaseRef.current)
+            : 0;
+          bodyGroupRef.current.rotation.z +=
+            (roll - bodyGroupRef.current.rotation.z) * 0.2;
         }
       }
     });
 
     return (
       <group ref={ref} name="gizmo">
-        <group ref={bodyGroupRef} name="body-group">
-          <mesh
-            name="body-core"
-            position={[0, 0.52, 0]}
-            scale={[0.72, 0.58, 0.9]}
-          >
-            <sphereGeometry args={[0.5, 12, 10]} />
-            <meshLambertMaterial color={FUR_CREAM} />
-          </mesh>
+        {/* Raises geometry so the lowest paw sits at y=0 */}
+        <group position={[0, 0.15, 0]}>
+          <group ref={bodyGroupRef} name="body-group">
+            <mesh
+              name="body-core"
+              position={[0, 0.52, 0]}
+              scale={[0.72, 0.58, 0.9]}
+            >
+              <sphereGeometry args={[0.5, 12, 10]} />
+              <meshLambertMaterial color={FUR_CREAM} />
+            </mesh>
 
-          <mesh
-            name="body-top-fluff"
-            position={[0, 0.68, 0.05]}
-            scale={[0.64, 0.46, 0.78]}
-          >
-            <sphereGeometry args={[0.5, 10, 8]} />
-            <meshLambertMaterial color={FUR_LIGHT} />
-          </mesh>
+            <mesh
+              name="body-top-fluff"
+              position={[0, 0.68, 0.05]}
+              scale={[0.64, 0.46, 0.78]}
+            >
+              <sphereGeometry args={[0.5, 10, 8]} />
+              <meshLambertMaterial color={FUR_LIGHT} />
+            </mesh>
 
-          <mesh
-            name="chest-fluff"
-            position={[0, 0.44, 0.32]}
-            scale={[0.56, 0.5, 0.55]}
-          >
-            <sphereGeometry args={[0.5, 10, 8]} />
-            <meshLambertMaterial color={FUR_LIGHT} />
-          </mesh>
+            <mesh
+              name="chest-fluff"
+              position={[0, 0.44, 0.32]}
+              scale={[0.56, 0.5, 0.55]}
+            >
+              <sphereGeometry args={[0.5, 10, 8]} />
+              <meshLambertMaterial color={FUR_LIGHT} />
+            </mesh>
 
-          <mesh
-            name="neck"
-            position={[0, 0.86, 0.22]}
-            scale={[0.28, 0.3, 0.28]}
-          >
-            <sphereGeometry args={[0.5, 10, 8]} />
-            <meshLambertMaterial color={FUR_CREAM} />
-          </mesh>
+            <mesh
+              name="neck"
+              position={[0, 0.86, 0.22]}
+              scale={[0.28, 0.3, 0.28]}
+            >
+              <sphereGeometry args={[0.5, 10, 8]} />
+              <meshLambertMaterial color={FUR_CREAM} />
+            </mesh>
 
-          <mesh name="head" position={[0, 1.04, 0.4]}>
-            <sphereGeometry args={[0.33, 14, 12]} />
-            <meshLambertMaterial color={FUR_CREAM} />
-          </mesh>
+            <mesh name="head" position={[0, 1.04, 0.4]}>
+              <sphereGeometry args={[0.33, 14, 12]} />
+              <meshLambertMaterial color={FUR_CREAM} />
+            </mesh>
 
-          <mesh
-            name="cheek-left"
-            position={[-0.22, 1.02, 0.44]}
-            scale={[0.34, 0.3, 0.3]}
-          >
-            <sphereGeometry args={[0.5, 8, 8]} />
-            <meshLambertMaterial color={FUR_LIGHT} />
-          </mesh>
+            {/* Golden crown patch — Yorkie-style cap marking */}
+            <mesh
+              name="head-crown"
+              position={[0, 1.27, 0.3]}
+              scale={[0.38, 0.17, 0.36]}
+            >
+              <sphereGeometry args={[0.5, 10, 8]} />
+              <meshLambertMaterial color={FUR_GOLDEN} />
+            </mesh>
 
-          <mesh
-            name="cheek-right"
-            position={[0.22, 1.02, 0.44]}
-            scale={[0.34, 0.3, 0.3]}
-          >
-            <sphereGeometry args={[0.5, 8, 8]} />
-            <meshLambertMaterial color={FUR_LIGHT} />
-          </mesh>
+            {/* Floppy ears hanging from the sides of the head */}
+            <mesh
+              name="ear-left"
+              position={[-0.33, 0.97, 0.27]}
+              scale={[0.15, 0.44, 0.11]}
+              rotation={[0.15, 0, 0.1]}
+            >
+              <sphereGeometry args={[0.5, 8, 7]} />
+              <meshLambertMaterial color={FUR_TAN} />
+            </mesh>
+            <mesh
+              name="ear-right"
+              position={[0.33, 0.97, 0.27]}
+              scale={[0.15, 0.44, 0.11]}
+              rotation={[0.15, 0, -0.1]}
+            >
+              <sphereGeometry args={[0.5, 8, 7]} />
+              <meshLambertMaterial color={FUR_TAN} />
+            </mesh>
 
-          <mesh
-            name="snout"
-            position={[0, 0.97, 0.66]}
-            scale={[0.36, 0.27, 0.32]}
-          >
-            <sphereGeometry args={[0.5, 10, 8]} />
-            <meshLambertMaterial color={SNOUT_GREY} />
-          </mesh>
+            <mesh
+              name="cheek-left"
+              position={[-0.22, 1.02, 0.44]}
+              scale={[0.34, 0.3, 0.3]}
+            >
+              <sphereGeometry args={[0.5, 8, 8]} />
+              <meshLambertMaterial color={FUR_LIGHT} />
+            </mesh>
 
-          <mesh name="nose" position={[0, 0.97, 0.83]}>
-            <sphereGeometry args={[0.026, 8, 6]} />
-            <meshLambertMaterial color={NOSE_DARK} />
-          </mesh>
+            <mesh
+              name="cheek-right"
+              position={[0.22, 1.02, 0.44]}
+              scale={[0.34, 0.3, 0.3]}
+            >
+              <sphereGeometry args={[0.5, 8, 8]} />
+              <meshLambertMaterial color={FUR_LIGHT} />
+            </mesh>
 
-          <mesh name="eye-left-sclera" position={[-0.12, 1.1, 0.69]}>
-            <sphereGeometry args={[0.085, 10, 8]} />
-            <meshLambertMaterial color={EYE_WHITE} />
-          </mesh>
-          <mesh name="eye-left-iris" position={[-0.12, 1.1, 0.74]}>
-            <sphereGeometry args={[0.066, 10, 8]} />
-            <meshLambertMaterial color={EYE_DARK} />
-          </mesh>
-          <mesh name="eye-left-shine" position={[-0.08, 1.14, 0.79]}>
-            <circleGeometry args={[0.022, 16]} />
-            <meshBasicMaterial color={EYE_SHINE} />
-          </mesh>
+            <mesh
+              name="snout"
+              position={[0, 0.97, 0.66]}
+              scale={[0.36, 0.27, 0.32]}
+            >
+              <sphereGeometry args={[0.5, 10, 8]} />
+              <meshLambertMaterial color={SNOUT_GREY} />
+            </mesh>
 
-          <mesh name="eye-right-sclera" position={[0.12, 1.1, 0.69]}>
-            <sphereGeometry args={[0.085, 10, 8]} />
-            <meshLambertMaterial color={EYE_WHITE} />
-          </mesh>
-          <mesh name="eye-right-iris" position={[0.12, 1.1, 0.74]}>
-            <sphereGeometry args={[0.066, 10, 8]} />
-            <meshLambertMaterial color={EYE_DARK} />
-          </mesh>
-          <mesh name="eye-right-shine" position={[0.16, 1.14, 0.79]}>
-            <circleGeometry args={[0.022, 16]} />
-            <meshBasicMaterial color={EYE_SHINE} />
-          </mesh>
+            <mesh name="nose" position={[0, 0.97, 0.83]}>
+              <sphereGeometry args={[0.026, 8, 6]} />
+              <meshLambertMaterial color={NOSE_DARK} />
+            </mesh>
 
-          <mesh
-            name="tail-base"
-            position={[0, 0.84, -0.5]}
-            rotation={[-0.7, 0, 0.1]}
-            scale={[0.46, 0.52, 0.4]}
-          >
-            <sphereGeometry args={[0.5, 8, 6]} />
-            <meshLambertMaterial color={FUR_LIGHT} />
-          </mesh>
-          <mesh
-            name="tail-tip"
-            position={[0.04, 0.98, -0.58]}
-            rotation={[-1.1, 0, 0.15]}
-            scale={[0.34, 0.4, 0.3]}
-          >
-            <sphereGeometry args={[0.5, 8, 6]} />
-            <meshLambertMaterial color={FUR_LIGHT} />
-          </mesh>
+            <mesh name="eye-left-sclera" position={[-0.12, 1.1, 0.69]}>
+              <sphereGeometry args={[0.085, 10, 8]} />
+              <meshLambertMaterial color={EYE_WHITE} />
+            </mesh>
+            <mesh name="eye-left-iris" position={[-0.12, 1.1, 0.74]}>
+              <sphereGeometry args={[0.066, 10, 8]} />
+              <meshLambertMaterial color={EYE_DARK} />
+            </mesh>
+            <mesh name="eye-left-shine" position={[-0.08, 1.14, 0.79]}>
+              <circleGeometry args={[0.022, 16]} />
+              <meshBasicMaterial color={EYE_SHINE} />
+            </mesh>
+
+            <mesh name="eye-right-sclera" position={[0.12, 1.1, 0.69]}>
+              <sphereGeometry args={[0.085, 10, 8]} />
+              <meshLambertMaterial color={EYE_WHITE} />
+            </mesh>
+            <mesh name="eye-right-iris" position={[0.12, 1.1, 0.74]}>
+              <sphereGeometry args={[0.066, 10, 8]} />
+              <meshLambertMaterial color={EYE_DARK} />
+            </mesh>
+            <mesh name="eye-right-shine" position={[0.16, 1.14, 0.79]}>
+              <circleGeometry args={[0.022, 16]} />
+              <meshBasicMaterial color={EYE_SHINE} />
+            </mesh>
+
+            <mesh
+              name="tail-base"
+              position={[0, 0.84, -0.5]}
+              rotation={[-0.7, 0, 0.1]}
+              scale={[0.46, 0.52, 0.4]}
+            >
+              <sphereGeometry args={[0.5, 8, 6]} />
+              <meshLambertMaterial color={FUR_LIGHT} />
+            </mesh>
+            <mesh
+              name="tail-tip"
+              position={[0.04, 0.98, -0.58]}
+              rotation={[-1.1, 0, 0.15]}
+              scale={[0.34, 0.4, 0.3]}
+            >
+              <sphereGeometry args={[0.5, 8, 6]} />
+              <meshLambertMaterial color={FUR_LIGHT} />
+            </mesh>
+          </group>
+
+          <LegGroup
+            position={[-0.21, 0.42, 0.27]}
+            phaseOffset={0}
+            walkPhaseRef={walkPhaseRef}
+            movingRef={movingRef}
+            jumpingRef={jumpingRef}
+          />
+          <LegGroup
+            position={[0.21, 0.42, 0.27]}
+            phaseOffset={Math.PI}
+            walkPhaseRef={walkPhaseRef}
+            movingRef={movingRef}
+            jumpingRef={jumpingRef}
+          />
+          <LegGroup
+            position={[-0.2, 0.38, -0.22]}
+            phaseOffset={Math.PI}
+            walkPhaseRef={walkPhaseRef}
+            movingRef={movingRef}
+            jumpingRef={jumpingRef}
+          />
+          <LegGroup
+            position={[0.2, 0.38, -0.22]}
+            phaseOffset={0}
+            walkPhaseRef={walkPhaseRef}
+            movingRef={movingRef}
+            jumpingRef={jumpingRef}
+          />
         </group>
-
-        <LegGroup
-          position={[-0.21, 0.42, 0.27]}
-          phaseOffset={0}
-          walkPhaseRef={walkPhaseRef}
-          movingRef={movingRef}
-          jumpingRef={jumpingRef}
-        />
-        <LegGroup
-          position={[0.21, 0.42, 0.27]}
-          phaseOffset={Math.PI}
-          walkPhaseRef={walkPhaseRef}
-          movingRef={movingRef}
-          jumpingRef={jumpingRef}
-        />
-        <LegGroup
-          position={[-0.2, 0.38, -0.22]}
-          phaseOffset={Math.PI}
-          walkPhaseRef={walkPhaseRef}
-          movingRef={movingRef}
-          jumpingRef={jumpingRef}
-        />
-        <LegGroup
-          position={[0.2, 0.38, -0.22]}
-          phaseOffset={0}
-          walkPhaseRef={walkPhaseRef}
-          movingRef={movingRef}
-          jumpingRef={jumpingRef}
-        />
       </group>
     );
   },

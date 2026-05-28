@@ -6,7 +6,7 @@ import { Color } from "three";
 import * as THREE from "three";
 import GizmoModel from "./characters/GizmoModel";
 import Gizmo from "./characters/Gizmo";
-import { CharacterId, CHARACTER_OPTIONS, SELECT_STYLE } from "./App";
+import { CharacterId, CHARACTER_OPTIONS, SelectField } from "./App";
 
 const BUTTON_STYLE: React.CSSProperties = {
   background: "rgba(255,255,255,0.08)",
@@ -158,17 +158,17 @@ const CharacterViewer = ({ characterId, onCharacterChange }: Props) => {
         <button style={BUTTON_STYLE} onClick={() => navigate("/")}>
           ← terrain
         </button>
-        <select
-          style={{ ...SELECT_STYLE, backdropFilter: "blur(4px)" }}
+        <SelectField
           value={characterId}
-          onChange={(e) => onCharacterChange(e.target.value as CharacterId)}
+          onChange={(v) => onCharacterChange(v as CharacterId)}
+          wrapperStyle={{ backdropFilter: "blur(4px)" }}
         >
           {CHARACTER_OPTIONS.map((c) => (
             <option key={c.id} value={c.id}>
               {c.label}
             </option>
           ))}
-        </select>
+        </SelectField>
       </div>
 
       <div style={HINT_STYLE}>drag to orbit · scroll to zoom</div>

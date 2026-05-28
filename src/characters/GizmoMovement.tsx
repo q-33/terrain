@@ -4,6 +4,7 @@ import * as THREE from "three";
 import { OrbitControls as OrbitControlsBase } from "three-stdlib";
 import { fractalNoise } from "../noise";
 import {
+  CAMERA_TARGET_HEIGHT,
   KEYBOARD_MOVE_SPEED,
   KEYBOARD_TURN_SPEED,
   TERRAIN_NOISE_FREQUENCY,
@@ -46,7 +47,6 @@ const GizmoMovement = ({
   const yAxis = useRef(new THREE.Vector3(0, 1, 0));
   const jumpVel = useRef(0);
   const jumpY = useRef(0);
-  const prevJumpY = useRef(0);
   const spaceConsumed = useRef(false);
 
   useEffect(() => {
@@ -108,20 +108,12 @@ const GizmoMovement = ({
       spaceConsumed.current = true;
     }
 
-    // Apply jump physics
-    prevJumpY.current = jumpY.current;
     if (jumpVel.current !== 0 || jumpY.current > 0) {
       jumpVel.current -= GRAVITY * delta;
       jumpY.current = Math.max(0, jumpY.current + jumpVel.current * delta);
       if (jumpY.current === 0 && jumpVel.current < 0) {
         jumpVel.current = 0;
       }
-    }
-
-    const jumpDelta = jumpY.current - prevJumpY.current;
-    if (jumpDelta !== 0) {
-      camera.position.y += jumpDelta;
-      controls.target.y += jumpDelta;
     }
 
     jumpingRef.current = jumpY.current > 0;
@@ -136,6 +128,14 @@ const GizmoMovement = ({
     const ty = terrainHeightAt(tx, tz);
     gizmo.position.set(tx, ty + jumpY.current, tz);
     gizmo.rotation.y = Math.atan2(fwd.current.x, fwd.current.z);
+
+    // Keep orbit offset constant as terrain height changes under the character.
+    // By applying the same Y delta to both target and camera, the spherical
+    // orbit shape is preserved — the view angle stays locked to the horizon.
+    const newTargetY = ty + jumpY.current + CAMERA_TARGET_HEIGHT;
+    const targetYDelta = newTargetY - controls.target.y;
+    controls.target.y = newTargetY;
+    camera.position.y += targetYDelta;
   });
 
   return null;

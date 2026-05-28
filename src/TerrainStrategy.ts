@@ -1,10 +1,12 @@
+import { RGB } from "./types";
+
 export type TerrainStrategy = {
   name: string;
   skyColor: string;
   fogColor: string;
   defaultFogDensity: number;
   defaultViewDistance: number;
-  colorForHeight: (height: number) => [number, number, number];
+  colorForHeight: (height: number) => RGB;
 };
 
 export const earthStrategy: TerrainStrategy = {

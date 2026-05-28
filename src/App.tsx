@@ -9,6 +9,17 @@ import {
   ALL_STRATEGIES,
   TerrainStrategy,
 } from "./TerrainStrategy";
+import {
+  CAMERA_FAR,
+  CAMERA_FOV,
+  CAMERA_INITIAL_POSITION,
+  CAMERA_NEAR,
+  ORBIT_DAMPING_FACTOR,
+  ORBIT_MAX_DISTANCE,
+  ORBIT_MAX_POLAR_ANGLE,
+  ORBIT_MIN_DISTANCE,
+  ORBIT_MIN_POLAR_ANGLE,
+} from "./constants";
 
 type OrbitControlsImpl = OrbitControlsBase;
 import Terrain from "./Terrain";
@@ -36,24 +47,58 @@ const fogNearFar = (
   return [near, far];
 };
 
-export const SELECT_STYLE: React.CSSProperties = {
+const SELECT_STYLE: React.CSSProperties = {
   background: "rgba(0,0,0,0.45)",
   border: "1px solid rgba(255,255,255,0.18)",
   color: "rgba(255,255,255,0.82)",
   fontSize: 12,
   fontFamily: "monospace",
-  padding: "5px 10px",
+  padding: "5px 24px 5px 10px",
   borderRadius: 8,
   cursor: "pointer",
   letterSpacing: "0.04em",
   outline: "none",
   appearance: "none" as const,
   WebkitAppearance: "none" as const,
-  paddingRight: 28,
-  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(255,255,255,0.4)'/%3E%3C/svg%3E")`,
-  backgroundRepeat: "no-repeat",
-  backgroundPosition: "right 10px center",
 };
+
+const SELECT_ARROW_STYLE: React.CSSProperties = {
+  position: "absolute",
+  right: 8,
+  top: "50%",
+  transform: "translateY(-50%)",
+  pointerEvents: "none",
+  color: "rgba(255,255,255,0.4)",
+  fontSize: 10,
+  lineHeight: "1",
+};
+
+type SelectFieldProps = {
+  value: string;
+  onChange: (value: string) => void;
+  wrapperStyle?: React.CSSProperties;
+  children: React.ReactNode;
+};
+
+export const SelectField = ({
+  value,
+  onChange,
+  wrapperStyle,
+  children,
+}: SelectFieldProps) => (
+  <div
+    style={{ position: "relative", display: "inline-block", ...wrapperStyle }}
+  >
+    <select
+      style={SELECT_STYLE}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    >
+      {children}
+    </select>
+    <span style={SELECT_ARROW_STYLE}>▾</span>
+  </div>
+);
 
 const App = () => {
   const [characterId, setCharacterId] = useState<CharacterId>("builtin");
@@ -151,7 +196,12 @@ const TerrainView = ({ characterId, onCharacterChange }: TerrainViewProps) => {
   return (
     <>
       <Canvas
-        camera={{ fov: 60, near: 0.1, far: 700, position: [0, 2.5, 6] }}
+        camera={{
+          fov: CAMERA_FOV,
+          near: CAMERA_NEAR,
+          far: CAMERA_FAR,
+          position: CAMERA_INITIAL_POSITION,
+        }}
         gl={{ antialias: true }}
         onCreated={({ scene }) => {
           sceneRef.current = scene;
@@ -169,11 +219,12 @@ const TerrainView = ({ characterId, onCharacterChange }: TerrainViewProps) => {
         <OrbitControls
           ref={controlsRef}
           enableDamping
-          dampingFactor={0.06}
-          minDistance={2}
-          maxDistance={80}
-          minPolarAngle={Math.PI / 8}
-          maxPolarAngle={Math.PI / 2.5}
+          dampingFactor={ORBIT_DAMPING_FACTOR}
+          minDistance={ORBIT_MIN_DISTANCE}
+          maxDistance={ORBIT_MAX_DISTANCE}
+          minPolarAngle={ORBIT_MIN_POLAR_ANGLE}
+          maxPolarAngle={ORBIT_MAX_POLAR_ANGLE}
+          enableKeys={false}
         />
         <GizmoMovement
           controlsRef={controlsRef}
@@ -221,17 +272,16 @@ const TerrainView = ({ characterId, onCharacterChange }: TerrainViewProps) => {
           alignItems: "center",
         }}
       >
-        <select
-          style={SELECT_STYLE}
+        <SelectField
           value={characterId}
-          onChange={(e) => onCharacterChange(e.target.value as CharacterId)}
+          onChange={(v) => onCharacterChange(v as CharacterId)}
         >
           {CHARACTER_OPTIONS.map((c) => (
             <option key={c.id} value={c.id}>
               {c.label}
             </option>
           ))}
-        </select>
+        </SelectField>
         <button
           style={{
             background: "rgba(0,0,0,0.45)",

@@ -1,4 +1,5 @@
 import { useMemo, useRef, useEffect } from "react";
+import { RGB } from "./types";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import {
@@ -37,7 +38,7 @@ const writeVertex = (
   x: number,
   y: number,
   z: number,
-  color: [number, number, number],
+  color: RGB,
 ): void => {
   positions[i * 3] = x;
   positions[i * 3 + 1] = y;
