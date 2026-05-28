@@ -1,32 +1,131 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, Suspense } from "react";
+import { Routes, Route, useNavigate } from "react-router-dom";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
-import { Color, Fog, Scene } from "three";
+import { Color, Fog, Group, Scene } from "three";
 import { OrbitControls as OrbitControlsBase } from "three-stdlib";
+import {
+  earthStrategy,
+  ALL_STRATEGIES,
+  TerrainStrategy,
+} from "./TerrainStrategy";
 
-type OrbitControlsImpl = OrbitControlsBase & { rotateLeft: (angle: number) => void };
-import { earthStrategy, ALL_STRATEGIES, TerrainStrategy } from "./TerrainStrategy";
+type OrbitControlsImpl = OrbitControlsBase;
 import Terrain from "./Terrain";
-import KeyboardMovement from "./KeyboardMovement";
 import SettingsPanel from "./SettingsPanel";
+import Gizmo from "./characters/Gizmo";
+import GizmoModel from "./characters/GizmoModel";
+import GizmoMovement from "./characters/GizmoMovement";
+import CharacterViewer from "./CharacterViewer";
 
-// viewDistance 0–100 → fog.far (40–250)
+export type CharacterId = "model" | "builtin";
+
+export const CHARACTER_OPTIONS: { id: CharacterId; label: string }[] = [
+  { id: "builtin", label: "Gizmo · built-in" },
+  { id: "model", label: "Gizmo · model" },
+];
+
+// viewDistance 0–100 → fog.far (40–650)
 // fogDensity   0–100 → fog.near as fraction of far (0%=thin, 100%=thick)
 const fogNearFar = (
   density: number,
   viewDistance: number,
 ): [number, number] => {
-  const far = 40 + (viewDistance / 100) * 210;
+  const far = 40 + (viewDistance / 100) * 610;
   const near = far * (1 - (density / 100) * 0.9);
   return [near, far];
 };
 
+export const SELECT_STYLE: React.CSSProperties = {
+  background: "rgba(0,0,0,0.45)",
+  border: "1px solid rgba(255,255,255,0.18)",
+  color: "rgba(255,255,255,0.82)",
+  fontSize: 12,
+  fontFamily: "monospace",
+  padding: "5px 10px",
+  borderRadius: 8,
+  cursor: "pointer",
+  letterSpacing: "0.04em",
+  outline: "none",
+  appearance: "none" as const,
+  WebkitAppearance: "none" as const,
+  paddingRight: 28,
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(255,255,255,0.4)'/%3E%3C/svg%3E")`,
+  backgroundRepeat: "no-repeat",
+  backgroundPosition: "right 10px center",
+};
+
 const App = () => {
+  const [characterId, setCharacterId] = useState<CharacterId>("builtin");
+
+  return (
+    <Routes>
+      <Route
+        path="/"
+        element={
+          <TerrainView
+            characterId={characterId}
+            onCharacterChange={setCharacterId}
+          />
+        }
+      />
+      <Route
+        path="/characters"
+        element={
+          <CharacterViewer
+            characterId={characterId}
+            onCharacterChange={setCharacterId}
+          />
+        }
+      />
+    </Routes>
+  );
+};
+
+type ActiveCharacterProps = {
+  gizmoRef: React.RefObject<Group | null>;
+  movingRef: React.RefObject<boolean>;
+  jumpingRef: React.RefObject<boolean>;
+  characterId: CharacterId;
+};
+
+const ActiveCharacter = ({
+  gizmoRef,
+  movingRef,
+  jumpingRef,
+  characterId,
+}: ActiveCharacterProps) => {
+  if (characterId === "model") {
+    return (
+      <Suspense fallback={null}>
+        <GizmoModel
+          ref={gizmoRef}
+          movingRef={movingRef}
+          jumpingRef={jumpingRef}
+        />
+      </Suspense>
+    );
+  }
+  return <Gizmo ref={gizmoRef} movingRef={movingRef} jumpingRef={jumpingRef} />;
+};
+
+type TerrainViewProps = {
+  characterId: CharacterId;
+  onCharacterChange: (id: CharacterId) => void;
+};
+
+const TerrainView = ({ characterId, onCharacterChange }: TerrainViewProps) => {
+  const navigate = useNavigate();
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const fogRef = useRef<Fog | null>(null);
   const sceneRef = useRef<Scene | null>(null);
+  const gizmoRef = useRef<Group | null>(null);
+  const movingRef = useRef(false);
+  const jumpingRef = useRef(false);
   const [fogDensity, setFogDensity] = useState(earthStrategy.defaultFogDensity);
-  const [viewDistance, setViewDistance] = useState(earthStrategy.defaultViewDistance);
+  const [viewDistance, setViewDistance] = useState(
+    earthStrategy.defaultViewDistance,
+  );
   const [strategy, setStrategy] = useState<TerrainStrategy>(earthStrategy);
 
   useEffect(() => {
@@ -52,7 +151,7 @@ const App = () => {
   return (
     <>
       <Canvas
-        camera={{ fov: 60, near: 0.1, far: 300, position: [0, 22, 28] }}
+        camera={{ fov: 60, near: 0.1, far: 700, position: [0, 2.5, 6] }}
         gl={{ antialias: true }}
         onCreated={({ scene }) => {
           sceneRef.current = scene;
@@ -71,12 +170,23 @@ const App = () => {
           ref={controlsRef}
           enableDamping
           dampingFactor={0.06}
-          minDistance={4}
+          minDistance={2}
           maxDistance={80}
           minPolarAngle={Math.PI / 8}
-          maxPolarAngle={Math.PI / 2.2}
+          maxPolarAngle={Math.PI / 2.5}
         />
-        <KeyboardMovement controlsRef={controlsRef} />
+        <GizmoMovement
+          controlsRef={controlsRef}
+          gizmoRef={gizmoRef}
+          movingRef={movingRef}
+          jumpingRef={jumpingRef}
+        />
+        <ActiveCharacter
+          gizmoRef={gizmoRef}
+          movingRef={movingRef}
+          jumpingRef={jumpingRef}
+          characterId={characterId}
+        />
         <Terrain strategy={strategy} />
       </Canvas>
 
@@ -97,8 +207,47 @@ const App = () => {
           whiteSpace: "nowrap",
         }}
       >
-        ↑↓ move &nbsp;|&nbsp; ←→ turn &nbsp;|&nbsp; drag — orbit &nbsp;|&nbsp;
-        scroll — zoom
+        ↑↓ move &nbsp;|&nbsp; ←→ turn &nbsp;|&nbsp; space — jump &nbsp;|&nbsp;
+        drag — orbit &nbsp;|&nbsp; scroll — zoom
+      </div>
+
+      <div
+        style={{
+          position: "fixed",
+          top: 16,
+          right: 16,
+          display: "flex",
+          gap: 8,
+          alignItems: "center",
+        }}
+      >
+        <select
+          style={SELECT_STYLE}
+          value={characterId}
+          onChange={(e) => onCharacterChange(e.target.value as CharacterId)}
+        >
+          {CHARACTER_OPTIONS.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.label}
+            </option>
+          ))}
+        </select>
+        <button
+          style={{
+            background: "rgba(0,0,0,0.45)",
+            border: "1px solid rgba(255,255,255,0.18)",
+            color: "rgba(255,255,255,0.82)",
+            fontSize: 12,
+            fontFamily: "monospace",
+            padding: "6px 14px",
+            borderRadius: 8,
+            cursor: "pointer",
+            letterSpacing: "0.04em",
+          }}
+          onClick={() => navigate("/characters")}
+        >
+          characters →
+        </button>
       </div>
 
       <SettingsPanel

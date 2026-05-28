@@ -16,7 +16,8 @@ import { fractalNoise } from "./noise";
 import { TerrainStrategy } from "./TerrainStrategy";
 
 // Tile large enough that fog always hides the edge:
-// TERRAIN_TILE_SIZE/2 - TERRAIN_REGEN_DISTANCE > fog far  →  120 - 40 = 80 > 75 ✓
+// TERRAIN_TILE_SIZE/2 - TERRAIN_REGEN_DISTANCE > fog far  →  360 - 120 = 240 < 650 max
+// Keep fog view distance slider below ~35% when at tile edge or increase SIZE further.
 const VERT_COUNT = TERRAIN_SEGMENTS * TERRAIN_SEGMENTS * 6; // 2 tris × 3 verts per quad
 
 const sampleTerrainHeight = (worldX: number, worldZ: number): number =>
@@ -114,7 +115,13 @@ const Terrain = ({ strategy }: TerrainProps) => {
     strategyRef.current = strategy;
     const positions = geo.attributes.position.array as Float32Array;
     const colors = geo.attributes.color.array as Float32Array;
-    populateTerrainBuffers(positions, colors, center.current.x, center.current.y, strategy);
+    populateTerrainBuffers(
+      positions,
+      colors,
+      center.current.x,
+      center.current.y,
+      strategy,
+    );
     geo.attributes.color.needsUpdate = true;
   }, [strategy, geo]);
 
@@ -134,7 +141,13 @@ const Terrain = ({ strategy }: TerrainProps) => {
 
     const positions = geo.attributes.position.array as Float32Array;
     const colors = geo.attributes.color.array as Float32Array;
-    populateTerrainBuffers(positions, colors, snappedX, snappedZ, strategyRef.current);
+    populateTerrainBuffers(
+      positions,
+      colors,
+      snappedX,
+      snappedZ,
+      strategyRef.current,
+    );
     geo.attributes.position.needsUpdate = true;
     geo.attributes.color.needsUpdate = true;
     geo.computeVertexNormals();

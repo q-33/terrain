@@ -26,7 +26,7 @@ export const earthStrategy: TerrainStrategy = {
     if (h < 9.0) {
       return [0.42, 0.36, 0.31]; // rock
     }
-    return [0.85, 0.90, 0.90]; // snow
+    return [0.85, 0.9, 0.9]; // snow
   },
 };
 
@@ -38,18 +38,18 @@ export const marsStrategy: TerrainStrategy = {
   defaultViewDistance: 35,
   colorForHeight: (h) => {
     if (h < -4.0) {
-      return [0.20, 0.08, 0.06]; // crater floor
+      return [0.2, 0.08, 0.06]; // crater floor
     }
     if (h < 0.0) {
-      return [0.50, 0.20, 0.11]; // rusty lowlands
+      return [0.5, 0.2, 0.11]; // rusty lowlands
     }
     if (h < 4.0) {
       return [0.62, 0.32, 0.16]; // ochre plains
     }
     if (h < 7.5) {
-      return [0.70, 0.46, 0.30]; // dusty highlands
+      return [0.7, 0.46, 0.3]; // dusty highlands
     }
-    return [0.80, 0.66, 0.58]; // pale summit
+    return [0.8, 0.66, 0.58]; // pale summit
   },
 };
 
@@ -64,7 +64,7 @@ export const oceanFloorStrategy: TerrainStrategy = {
       return [0.04, 0.04, 0.08]; // hadal trench
     }
     if (h < -1.5) {
-      return [0.07, 0.10, 0.18]; // abyssal plain
+      return [0.07, 0.1, 0.18]; // abyssal plain
     }
     if (h < 2.0) {
       return [0.15, 0.19, 0.28]; // continental slope

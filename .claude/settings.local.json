@@ -21,7 +21,16 @@
       "Bash(pnpm build *)",
       "Bash(pnpm list *)",
       "Bash(pnpm add *)",
-      "Bash(node *)"
+      "Bash(node *)",
+      "Bash(gh run *)",
+      "Bash(git branch *)",
+      "Bash(git prune *)",
+      "Bash(rm -f .git/gc.log)",
+      "Bash(git reset *)",
+      "Bash(pnpm exec *)",
+      "Bash(pnpm prettier:write *)",
+      "Bash(echo \"PID $!\")",
+      "Bash(xargs cat *)"
     ]
   }
 }
