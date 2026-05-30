@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z } from "./Chunk";
 import { meshChunk, ChunkMesh } from "./mesher";
 import { World } from "./world";
+import { buildAtlasTexture } from "./textures";
 
 type Props = {
   world: World;
@@ -13,6 +14,7 @@ const buildGeometry = (mesh: ChunkMesh): THREE.BufferGeometry => {
   g.setAttribute("position", new THREE.BufferAttribute(mesh.positions, 3));
   g.setAttribute("normal", new THREE.BufferAttribute(mesh.normals, 3));
   g.setAttribute("color", new THREE.BufferAttribute(mesh.colors, 3));
+  g.setAttribute("uv", new THREE.BufferAttribute(mesh.uvs, 2));
   g.computeBoundingSphere();
   return g;
 };
@@ -51,10 +53,16 @@ const VoxelWorld = ({ world }: Props) => {
     lastVersionRef.current = version;
   }
 
-  const material = useMemo(
-    () => new THREE.MeshLambertMaterial({ vertexColors: true }),
-    [],
-  );
+  // Atlas built once at mount via offscreen canvas — no external PNG asset.
+  // vertexColors carries the per-vertex AO grayscale; Lambert multiplies
+  // map × color × lighting so corners read as inset.
+  const material = useMemo(() => {
+    const atlas = buildAtlasTexture();
+    return new THREE.MeshLambertMaterial({
+      map: atlas,
+      vertexColors: true,
+    });
+  }, []);
 
   // Snapshot the entries so the render output is stable for this render pass.
   const entries = Array.from(geosRef.current.entries());

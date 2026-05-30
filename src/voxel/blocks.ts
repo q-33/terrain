@@ -1,4 +1,4 @@
-import { RGB } from "../types";
+import { AtlasTile, TILES } from "./textures";
 
 // Single byte per voxel. Keep ids dense and small — block lookups are on the
 // hot path of the mesher and we want them to fit in L1 with room to spare.
@@ -14,10 +14,17 @@ export const enum BlockId {
   Snow = 8,
 }
 
-// Per-face colors so blocks like grass can have a green top, dirt sides, and
-// dirt bottom. Faces share a single color for plain blocks — the mesher just
-// indexes by face direction (0=+x, 1=-x, 2=+y, 3=-y, 4=+z, 5=-z).
-export type BlockFaceColors = readonly [RGB, RGB, RGB, RGB, RGB, RGB];
+// Per-face atlas tiles so blocks like grass can have a green top, dirt
+// bottom, and grass-edged sides. Face order matches the mesher: 0=+x,
+// 1=-x, 2=+y (top), 3=-y (bottom), 4=+z, 5=-z.
+export type BlockFaceTiles = readonly [
+  AtlasTile,
+  AtlasTile,
+  AtlasTile,
+  AtlasTile,
+  AtlasTile,
+  AtlasTile,
+];
 
 export type BlockType = {
   id: BlockId;
@@ -28,18 +35,29 @@ export type BlockType = {
   // Transparent blocks still emit faces against other transparent blocks of
   // a different type (so leaves render against air, water against air).
   transparent: boolean;
-  faceColors: BlockFaceColors;
+  faceTiles: BlockFaceTiles;
 };
 
-const uniformFace = (c: RGB): BlockFaceColors => [c, c, c, c, c, c];
+const allFaces = (t: AtlasTile): BlockFaceTiles => [t, t, t, t, t, t];
 
-const grassFaces: BlockFaceColors = [
-  [0.4, 0.32, 0.22], // +x side (dirt with grass overhang)
-  [0.4, 0.32, 0.22], // -x side
-  [0.32, 0.58, 0.22], // +y top (grass)
-  [0.36, 0.28, 0.2], // -y bottom (dirt)
-  [0.4, 0.32, 0.22], // +z side
-  [0.4, 0.32, 0.22], // -z side
+// Grass: green top, dirt bottom, mixed sides (grass strip over dirt).
+const grassFaces: BlockFaceTiles = [
+  TILES.grassSide, // +x
+  TILES.grassSide, // -x
+  TILES.grassTop, // +y
+  TILES.dirt, // -y
+  TILES.grassSide, // +z
+  TILES.grassSide, // -z
+];
+
+// Wood log: end-grain rings on top + bottom, vertical bark on sides.
+const woodFaces: BlockFaceTiles = [
+  TILES.woodSide,
+  TILES.woodSide,
+  TILES.woodTop,
+  TILES.woodTop,
+  TILES.woodSide,
+  TILES.woodSide,
 ];
 
 export const BLOCKS: readonly BlockType[] = [
@@ -48,68 +66,67 @@ export const BLOCKS: readonly BlockType[] = [
     name: "air",
     solid: false,
     transparent: true,
-    faceColors: uniformFace([0, 0, 0]),
+    faceTiles: allFaces(TILES.stone), // never sampled
   },
   {
     id: BlockId.Grass,
     name: "grass",
     solid: true,
     transparent: false,
-    faceColors: grassFaces,
+    faceTiles: grassFaces,
   },
   {
     id: BlockId.Dirt,
     name: "dirt",
     solid: true,
     transparent: false,
-    faceColors: uniformFace([0.4, 0.3, 0.2]),
+    faceTiles: allFaces(TILES.dirt),
   },
   {
     id: BlockId.Stone,
     name: "stone",
     solid: true,
     transparent: false,
-    faceColors: uniformFace([0.5, 0.5, 0.52]),
+    faceTiles: allFaces(TILES.stone),
   },
   {
     id: BlockId.Sand,
     name: "sand",
     solid: true,
     transparent: false,
-    faceColors: uniformFace([0.83, 0.76, 0.55]),
+    faceTiles: allFaces(TILES.sand),
   },
   {
     id: BlockId.Water,
     name: "water",
     solid: false,
     transparent: true,
-    faceColors: uniformFace([0.15, 0.38, 0.62]),
+    faceTiles: allFaces(TILES.water),
   },
   {
     id: BlockId.Wood,
     name: "wood",
     solid: true,
     transparent: false,
-    faceColors: uniformFace([0.42, 0.3, 0.18]),
+    faceTiles: woodFaces,
   },
   {
     id: BlockId.Leaves,
     name: "leaves",
     solid: true,
     transparent: true,
-    faceColors: uniformFace([0.25, 0.45, 0.18]),
+    faceTiles: allFaces(TILES.leaves),
   },
   {
     id: BlockId.Snow,
     name: "snow",
     solid: true,
     transparent: false,
-    faceColors: uniformFace([0.92, 0.95, 0.96]),
+    faceTiles: allFaces(TILES.snow),
   },
 ];
 
-// Direct lookup — id is the array index. Const-asserted so a stray missing
-// entry surfaces at type-check time, not as `undefined` at the hot path.
+// Direct lookup — id is the array index.
 export const blockOf = (id: BlockId): BlockType => BLOCKS[id];
 
 // True if a face between `here` and `neighbor` should emit. We render `here`'s
@@ -123,11 +140,8 @@ export const faceVisible = (here: BlockId, neighbor: BlockId): boolean => {
   if (neighbor === BlockId.Air) {
     return true;
   }
-  const hereBlock = BLOCKS[here];
   const neighborBlock = BLOCKS[neighbor];
   if (!neighborBlock.solid) {
-    // Air handled above; remaining non-solids (water) reveal neighboring
-    // solid faces and reveal other transparent block faces of a different id.
     return here !== neighbor;
   }
   if (neighborBlock.transparent && here !== neighbor) {
