@@ -5,13 +5,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-pnpm dev             # start dev server (Vite, usually http://localhost:5173)
-pnpm build           # type-check + bundle
-pnpm preview         # serve the production build
-pnpm prettier:write  # format all files under src/
+npm run dev          # start dev server (Vite, http://localhost:7777/terrain/)
+npm run build        # type-check + bundle
+npm run preview      # serve the production build
+npm run prettier:write  # format all files under src/
 ```
 
-There are no tests. `pnpm build` is the closest thing to a CI check — it will catch TypeScript errors.
+There are no tests. `npm run build` is the closest thing to a CI check — it will catch TypeScript errors.
 
 ## Code style
 
