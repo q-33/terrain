@@ -2,17 +2,12 @@ import { useRef, useEffect, RefObject } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { OrbitControls as OrbitControlsBase } from "three-stdlib";
-import { fractalNoise } from "../noise";
 import {
   CAMERA_TARGET_HEIGHT,
   KEYBOARD_MOVE_SPEED,
   KEYBOARD_TURN_SPEED,
-  TERRAIN_NOISE_FREQUENCY,
-  TERRAIN_NOISE_OCTAVES,
-  TERRAIN_NOISE_LACUNARITY,
-  TERRAIN_NOISE_GAIN,
-  TERRAIN_HEIGHT_SCALE,
 } from "../constants";
+import { sampleGroundHeight } from "../buildingPads";
 
 const JUMP_SPEED = 7;
 const GRAVITY = 20;
@@ -23,15 +18,6 @@ type Props = {
   movingRef: RefObject<boolean>;
   jumpingRef: RefObject<boolean>;
 };
-
-const terrainHeightAt = (x: number, z: number): number =>
-  fractalNoise(
-    x * TERRAIN_NOISE_FREQUENCY,
-    z * TERRAIN_NOISE_FREQUENCY,
-    TERRAIN_NOISE_OCTAVES,
-    TERRAIN_NOISE_LACUNARITY,
-    TERRAIN_NOISE_GAIN,
-  ) * TERRAIN_HEIGHT_SCALE;
 
 const GizmoMovement = ({
   controlsRef,
@@ -125,7 +111,7 @@ const GizmoMovement = ({
 
     const tx = controls.target.x;
     const tz = controls.target.z;
-    const ty = terrainHeightAt(tx, tz);
+    const ty = sampleGroundHeight(tx, tz);
     gizmo.position.set(tx, ty + jumpY.current, tz);
     gizmo.rotation.y = Math.atan2(fwd.current.x, fwd.current.z);
 
