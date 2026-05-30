@@ -20,6 +20,8 @@ import {
 } from "./dayNight";
 import VoxelWorld from "./voxel/VoxelWorld";
 import PlayerController from "./voxel/PlayerController";
+import Interactor from "./voxel/Interactor";
+import { World, populateInitialChunks } from "./voxel/world";
 import SettingsPanel from "./SettingsPanel";
 import DayNightCycle from "./DayNightCycle";
 import { readUrlState, writeUrlState } from "./urlState";
@@ -63,6 +65,15 @@ const AllowContextMenu = () => {
 
 const App = () => {
   const fogRef = useRef<Fog | null>(null);
+  // World lives in a ref so a fresh instance is created per App mount —
+  // safer than a module singleton during HMR, and the player/voxel/picker
+  // components all share the same one via props.
+  const worldRef = useRef<World | null>(null);
+  if (worldRef.current === null) {
+    worldRef.current = new World();
+    populateInitialChunks(worldRef.current);
+  }
+  const world = worldRef.current;
   const initialUrlState = useMemo(() => readUrlState(), []);
   const initialStrategy = useMemo(() => {
     const requested = initialUrlState.strategy?.toLowerCase();
@@ -140,10 +151,12 @@ const App = () => {
           onUnlock={() => setPointerLocked(false)}
         />
         <PlayerController
+          world={world}
           initialX={initialUrlState.x}
           initialZ={initialUrlState.z}
         />
-        <VoxelWorld />
+        <Interactor world={world} />
+        <VoxelWorld world={world} />
       </Canvas>
 
       {!pointerLocked && (
@@ -162,7 +175,27 @@ const App = () => {
             letterSpacing: "0.04em",
           }}
         >
-          click to play · WASD move · space jump · esc release
+          click to play · WASD move · space jump · left break · right place ·
+          esc release
+        </div>
+      )}
+
+      {pointerLocked && (
+        <div
+          style={{
+            position: "fixed",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            color: "rgba(255,255,255,0.85)",
+            fontFamily: "monospace",
+            fontSize: 18,
+            pointerEvents: "none",
+            textShadow: "0 0 4px rgba(0,0,0,0.8)",
+            userSelect: "none",
+          }}
+        >
+          +
         </div>
       )}
 

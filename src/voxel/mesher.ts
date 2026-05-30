@@ -1,6 +1,15 @@
 import { Chunk, CHUNK_SIZE_X, CHUNK_SIZE_Y, CHUNK_SIZE_Z } from "./Chunk";
 import { BlockId, blockOf, faceVisible } from "./blocks";
 
+// World-space block lookup. Lets the mesher consult neighbor chunks when
+// testing boundary faces — without this, every chunk's +x/-x/+z/-z border
+// would emit ~10-20% wasted faces buried inside the neighbor's terrain.
+export type WorldBlockGetter = (
+  worldX: number,
+  worldY: number,
+  worldZ: number,
+) => BlockId;
+
 // Face direction index → (normal, four CCW corner offsets relative to the
 // block's min corner). Order matches BlockType.faceColors:
 // 0:+x, 1:-x, 2:+y, 3:-y, 4:+z, 5:-z.
@@ -110,14 +119,19 @@ export type ChunkMesh = {
 // one color shared by its six vertices).
 //
 // Geometry is positioned in chunk-local coords (0..CHUNK_SIZE on each axis);
-// callers translate by chunk world origin when placing the mesh.
-export const meshChunk = (chunk: Chunk): ChunkMesh => {
-  // Worst case: every block has all 6 faces exposed = volume * 6 faces *
-  // 6 verts * 3 floats. In practice nothing comes close, but we allocate
-  // grow-able arrays to avoid the worst-case ~28 MB up-front.
+// callers translate by chunk world origin when placing the mesh. Neighbor
+// lookups go through `getBlock` (world coords) so chunk-boundary faces see
+// the actual neighbor chunk instead of treating the border as open air.
+export const meshChunk = (
+  chunk: Chunk,
+  getBlock: WorldBlockGetter,
+): ChunkMesh => {
   const positions: number[] = [];
   const normals: number[] = [];
   const colors: number[] = [];
+
+  const originX = chunk.chunkX * CHUNK_SIZE_X;
+  const originZ = chunk.chunkZ * CHUNK_SIZE_Z;
 
   for (let y = 0; y < CHUNK_SIZE_Y; y++) {
     for (let z = 0; z < CHUNK_SIZE_Z; z++) {
@@ -130,7 +144,11 @@ export const meshChunk = (chunk: Chunk): ChunkMesh => {
 
         for (let face = 0; face < 6; face++) {
           const def = FACE_DEFS[face];
-          const neighbor = chunk.getSafe(x + def.dx, y + def.dy, z + def.dz);
+          const neighbor = getBlock(
+            originX + x + def.dx,
+            y + def.dy,
+            originZ + z + def.dz,
+          );
           if (!faceVisible(here, neighbor)) {
             continue;
           }

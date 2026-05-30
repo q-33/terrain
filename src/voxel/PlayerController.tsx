@@ -9,10 +9,26 @@ import {
 } from "../constants";
 import { worldSurfaceHeight } from "./worldGen";
 import { writeUrlState } from "../urlState";
+import { World } from "./world";
 
 type Props = {
+  world: World;
   initialX?: number;
   initialZ?: number;
+};
+
+// Surface query that respects player edits. Queries the actual world first
+// — so dug holes drop the player and placed blocks support them — and
+// falls back to the procedural generator at the edge of the loaded area
+// so the player doesn't fall through unloaded chunks.
+const surfaceYFor = (world: World, worldX: number, worldZ: number): number => {
+  const x = Math.floor(worldX);
+  const z = Math.floor(worldZ);
+  const actual = world.topSolidY(x, z);
+  if (actual >= 0) {
+    return actual;
+  }
+  return worldSurfaceHeight(x, z);
 };
 
 // First-person walker. The camera IS the player — PointerLockControls
@@ -20,7 +36,7 @@ type Props = {
 // jump, and clamping to the voxel surface. No AABB collision against
 // blocks yet (Phase C); the player is treated as a point that snaps to
 // the top of whatever column they're standing in.
-const PlayerController = ({ initialX, initialZ }: Props): null => {
+const PlayerController = ({ world, initialX, initialZ }: Props): null => {
   const { camera } = useThree();
   const keys = useRef<Record<string, boolean>>({});
   const initialized = useRef(false);
@@ -57,11 +73,10 @@ const PlayerController = ({ initialX, initialZ }: Props): null => {
       if (initialZ !== undefined) {
         camera.position.z = initialZ;
       }
-      const surface = worldSurfaceHeight(
-        Math.floor(camera.position.x),
-        Math.floor(camera.position.z),
-      );
-      camera.position.y = surface + 1 + PLAYER_EYE_HEIGHT;
+      camera.position.y =
+        surfaceYFor(world, camera.position.x, camera.position.z) +
+        1 +
+        PLAYER_EYE_HEIGHT;
     }
 
     // Build a flat-XZ forward from the camera's look direction. If the
@@ -103,11 +118,10 @@ const PlayerController = ({ initialX, initialZ }: Props): null => {
 
     // Ground clamp — top of the surface block + eye height. Negative vel
     // on contact resets to a clean grounded state so jump triggers again.
-    const surface = worldSurfaceHeight(
-      Math.floor(camera.position.x),
-      Math.floor(camera.position.z),
-    );
-    const groundY = surface + 1 + PLAYER_EYE_HEIGHT;
+    const groundY =
+      surfaceYFor(world, camera.position.x, camera.position.z) +
+      1 +
+      PLAYER_EYE_HEIGHT;
     if (camera.position.y <= groundY) {
       camera.position.y = groundY;
       verticalVel.current = 0;

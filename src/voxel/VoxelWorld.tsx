@@ -1,19 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useRef, useSyncExternalStore } from "react";
 import * as THREE from "three";
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z } from "./Chunk";
-import { generateChunk } from "./worldGen";
 import { meshChunk, ChunkMesh } from "./mesher";
+import { World } from "./world";
 
-// Phase A v0: pre-generate a fixed grid of chunks around origin once at
-// mount. No streaming loader yet — that's a follow-up PR. With WORLD_RADIUS = 3
-// we render a 7×7 grid (49 chunks, 112×112 voxels) which is enough to see
-// terrain horizon-to-horizon and prove the mesher works.
-const WORLD_RADIUS = 3;
-
-type BuiltChunk = {
-  chunkX: number;
-  chunkZ: number;
-  geometry: THREE.BufferGeometry;
+type Props = {
+  world: World;
 };
 
 const buildGeometry = (mesh: ChunkMesh): THREE.BufferGeometry => {
@@ -25,37 +17,61 @@ const buildGeometry = (mesh: ChunkMesh): THREE.BufferGeometry => {
   return g;
 };
 
-const VoxelWorld = () => {
-  const chunks = useMemo<BuiltChunk[]>(() => {
-    const built: BuiltChunk[] = [];
-    for (let cz = -WORLD_RADIUS; cz <= WORLD_RADIUS; cz++) {
-      for (let cx = -WORLD_RADIUS; cx <= WORLD_RADIUS; cx++) {
-        const chunk = generateChunk(cx, cz);
-        const mesh = meshChunk(chunk);
-        built.push({ chunkX: cx, chunkZ: cz, geometry: buildGeometry(mesh) });
+const parseChunkKey = (key: string): [number, number] => {
+  const [cx, cz] = key.split(",");
+  return [Number(cx), Number(cz)];
+};
+
+const VoxelWorld = ({ world }: Props) => {
+  const version = useSyncExternalStore(world.subscribe, world.getVersion);
+  // Per-chunk geometry cache. Mutated imperatively when chunks go dirty;
+  // surrounding state (`version`) drives re-render so React picks up changes.
+  const geosRef = useRef<Map<string, THREE.BufferGeometry>>(new Map());
+  const lastVersionRef = useRef(-1);
+
+  // Re-mesh dirty chunks once per new version. Running this in render is
+  // idempotent — second invocation for the same version sees an empty dirty
+  // set and is a no-op. Doing it pre-JSX (instead of in an effect) avoids
+  // a one-frame flicker where the world renders empty before effects fire.
+  if (version !== lastVersionRef.current) {
+    const dirty = world.takeDirty();
+    for (const key of dirty) {
+      const [cx, cz] = parseChunkKey(key);
+      const chunk = world.getChunk(cx, cz);
+      if (!chunk) {
+        continue;
       }
+      const mesh = meshChunk(chunk, (x, y, z) => world.getBlock(x, y, z));
+      const old = geosRef.current.get(key);
+      if (old) {
+        old.dispose();
+      }
+      geosRef.current.set(key, buildGeometry(mesh));
     }
-    return built;
-  }, []);
+    lastVersionRef.current = version;
+  }
 
   const material = useMemo(
-    () =>
-      new THREE.MeshLambertMaterial({
-        vertexColors: true,
-      }),
+    () => new THREE.MeshLambertMaterial({ vertexColors: true }),
     [],
   );
 
+  // Snapshot the entries so the render output is stable for this render pass.
+  const entries = Array.from(geosRef.current.entries());
+
   return (
     <>
-      {chunks.map(({ chunkX, chunkZ, geometry }) => (
-        <mesh
-          key={`${chunkX},${chunkZ}`}
-          position={[chunkX * CHUNK_SIZE_X, 0, chunkZ * CHUNK_SIZE_Z]}
-          geometry={geometry}
-          material={material}
-        />
-      ))}
+      {entries.map(([key, geo]) => {
+        const [cx, cz] = parseChunkKey(key);
+        return (
+          <mesh
+            key={key}
+            position={[cx * CHUNK_SIZE_X, 0, cz * CHUNK_SIZE_Z]}
+            geometry={geo}
+            material={material}
+          />
+        );
+      })}
     </>
   );
 };
