@@ -18,6 +18,8 @@ There are no tests. `pnpm build` is the closest thing to a CI check — it will 
 - Always use curly braces for `if` bodies, even single-line ones. Never put `return` on the same line as `if`.
 - Always use `const` + arrow functions — never the `function` keyword. This applies to helpers, components, and exported functions alike.
 - Always use `type` over `interface` for declarations.
+- Never pad variable declarations to align `=` signs across lines. Each line is independently formatted — no C-style column alignment.
+- Always run `pnpm prettier:write` after generating or editing source files so committed code is always formatter-clean.
 
 ## Architecture
 

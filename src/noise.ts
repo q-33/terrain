@@ -1,9 +1,20 @@
+import { Vec3 } from "./types";
+
 // Lookup table mapping permutation indices to gradient vectors for Perlin noise.
 // 12 vectors point toward the edges/vertices of a cube, giving uniform gradient distribution.
-const gradients: [number, number, number][] = [
-  [1, 1, 0], [-1, 1, 0], [1, -1, 0], [-1, -1, 0],
-  [1, 0, 1], [-1, 0, 1], [1, 0, -1], [-1, 0, -1],
-  [0, 1, 1], [0, -1, 1], [0, 1, -1], [0, -1, -1],
+const gradients: Vec3[] = [
+  [1, 1, 0],
+  [-1, 1, 0],
+  [1, -1, 0],
+  [-1, -1, 0],
+  [1, 0, 1],
+  [-1, 0, 1],
+  [1, 0, -1],
+  [-1, 0, -1],
+  [0, 1, 1],
+  [0, -1, 1],
+  [0, 1, -1],
+  [0, -1, -1],
 ];
 
 // Doubled permutation table (512 entries) to avoid index wrapping in lookups.
@@ -28,13 +39,14 @@ const buildPermutationTable = (seed = 42): void => {
 
 buildPermutationTable();
 
-const dotWithGradient = (gradient: [number, number, number], x: number, y: number): number =>
+const dotWithGradient = (gradient: Vec3, x: number, y: number): number =>
   gradient[0] * x + gradient[1] * y;
 
 // Ken Perlin's quintic fade curve: smoothstep that has zero first and second derivatives at t=0,1.
 const quinticFade = (t: number): number => t * t * t * (t * (t * 6 - 15) + 10);
 
-const linearInterpolate = (a: number, b: number, t: number): number => a + t * (b - a);
+const linearInterpolate = (a: number, b: number, t: number): number =>
+  a + t * (b - a);
 
 export const perlin = (x: number, y: number): number => {
   const cellX = Math.floor(x) & 255;
@@ -45,14 +57,22 @@ export const perlin = (x: number, y: number): number => {
   const fadeY = quinticFade(localY);
 
   // Hash the four corners of the unit square to gradient indices.
-  const g00 = permutationTable[permutationTable[cellX]     + cellY];
-  const g01 = permutationTable[permutationTable[cellX]     + cellY + 1];
+  const g00 = permutationTable[permutationTable[cellX] + cellY];
+  const g01 = permutationTable[permutationTable[cellX] + cellY + 1];
   const g10 = permutationTable[permutationTable[cellX + 1] + cellY];
   const g11 = permutationTable[permutationTable[cellX + 1] + cellY + 1];
 
   return linearInterpolate(
-    linearInterpolate(dotWithGradient(gradients[g00 % 12], localX,     localY),     dotWithGradient(gradients[g10 % 12], localX - 1, localY),     fadeX),
-    linearInterpolate(dotWithGradient(gradients[g01 % 12], localX,     localY - 1), dotWithGradient(gradients[g11 % 12], localX - 1, localY - 1), fadeX),
+    linearInterpolate(
+      dotWithGradient(gradients[g00 % 12], localX, localY),
+      dotWithGradient(gradients[g10 % 12], localX - 1, localY),
+      fadeX,
+    ),
+    linearInterpolate(
+      dotWithGradient(gradients[g01 % 12], localX, localY - 1),
+      dotWithGradient(gradients[g11 % 12], localX - 1, localY - 1),
+      fadeX,
+    ),
     fadeY,
   );
 };

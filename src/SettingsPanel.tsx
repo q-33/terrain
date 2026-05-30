@@ -90,7 +90,8 @@ const SettingsPanel = ({
               cursor: "pointer",
               borderRadius: 5,
               border: "1px solid rgba(255,255,255,0.2)",
-              background: s === strategy ? "rgba(255,255,255,0.2)" : "transparent",
+              background:
+                s === strategy ? "rgba(255,255,255,0.2)" : "transparent",
               color: s === strategy ? "#fff" : "rgba(255,255,255,0.55)",
               transition: "background 0.15s, color 0.15s",
             }}
@@ -102,7 +103,11 @@ const SettingsPanel = ({
     </div>
 
     <Slider label="Fog density" value={fogDensity} onChange={onFogDensity} />
-    <Slider label="View distance" value={viewDistance} onChange={onViewDistance} />
+    <Slider
+      label="View distance"
+      value={viewDistance}
+      onChange={onViewDistance}
+    />
   </div>
 );
 

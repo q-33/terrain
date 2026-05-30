@@ -2,9 +2,9 @@ import { useRef, useEffect, RefObject } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { OrbitControls as OrbitControlsBase } from "three-stdlib";
+import { KEYBOARD_MOVE_SPEED, KEYBOARD_TURN_SPEED } from "./constants";
 
-type OrbitControlsImpl = OrbitControlsBase & { rotateLeft: (angle: number) => void };
-import { KEYBOARD_MOVE_SPEED } from "./constants";
+type OrbitControlsImpl = OrbitControlsBase;
 
 type Props = {
   controlsRef: RefObject<OrbitControlsImpl | null>;
@@ -15,6 +15,8 @@ const KeyboardMovement = ({ controlsRef }: Props): null => {
   const keys = useRef<Record<string, boolean>>({});
   const fwd = useRef(new THREE.Vector3());
   const move = useRef(new THREE.Vector3());
+  const offset = useRef(new THREE.Vector3());
+  const yAxis = useRef(new THREE.Vector3(0, 1, 0));
 
   useEffect(() => {
     const dn = (e: KeyboardEvent) => {
@@ -38,6 +40,13 @@ const KeyboardMovement = ({ controlsRef }: Props): null => {
     }
     const k = keys.current;
 
+    if (k["ArrowLeft"] || k["ArrowRight"]) {
+      const angle = k["ArrowLeft"] ? KEYBOARD_TURN_SPEED : -KEYBOARD_TURN_SPEED;
+      offset.current.subVectors(camera.position, controls.target);
+      offset.current.applyAxisAngle(yAxis.current, angle);
+      camera.position.copy(controls.target).add(offset.current);
+    }
+
     camera.getWorldDirection(fwd.current);
     fwd.current.y = 0;
     fwd.current.normalize();
@@ -53,13 +62,6 @@ const KeyboardMovement = ({ controlsRef }: Props): null => {
     if (move.current.lengthSq() > 0) {
       camera.position.add(move.current);
       controls.target.add(move.current);
-    }
-
-    if (k["ArrowLeft"]) {
-      controls.rotateLeft(0.025);
-    }
-    if (k["ArrowRight"]) {
-      controls.rotateLeft(-0.025);
     }
   });
 
