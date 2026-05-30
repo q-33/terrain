@@ -1,3 +1,4 @@
+import { RefObject, useEffect, useState } from "react";
 import { TerrainStrategy } from "./TerrainStrategy";
 
 type Props = {
@@ -8,6 +9,9 @@ type Props = {
   strategy: TerrainStrategy;
   onStrategy: (s: TerrainStrategy) => void;
   strategies: readonly TerrainStrategy[];
+  timeRef: RefObject<number>;
+  paused: boolean;
+  onPausedChange: (p: boolean) => void;
 };
 
 const Slider = ({
@@ -35,6 +39,74 @@ const Slider = ({
   </label>
 );
 
+// Polls the shared timeRef at 4 Hz to keep its display in sync with the
+// per-frame cycle without forcing the parent to re-render every tick.
+const TimeOfDaySlider = ({
+  timeRef,
+  paused,
+  onPausedChange,
+}: {
+  timeRef: RefObject<number>;
+  paused: boolean;
+  onPausedChange: (p: boolean) => void;
+}) => {
+  const [display, setDisplay] = useState(timeRef.current);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setDisplay(timeRef.current);
+    }, 250);
+    return () => clearInterval(id);
+  }, [timeRef]);
+
+  const hours = Math.floor(display * 24);
+  const minutes = Math.floor((display * 24 - hours) * 60);
+  const label = `${hours.toString().padStart(2, "0")}:${minutes
+    .toString()
+    .padStart(2, "0")}`;
+
+  return (
+    <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
+        <span>Time of day</span>
+        <span style={{ opacity: 0.55 }}>{label}</span>
+      </div>
+      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.001}
+          value={display}
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            timeRef.current = v;
+            setDisplay(v);
+          }}
+          style={{ flex: 1, accentColor: "#8fb4c8", cursor: "pointer" }}
+        />
+        <button
+          onClick={() => onPausedChange(!paused)}
+          title={paused ? "Resume" : "Pause"}
+          style={{
+            background: "transparent",
+            border: "1px solid rgba(255,255,255,0.25)",
+            color: "rgba(255,255,255,0.75)",
+            borderRadius: 4,
+            padding: "2px 8px",
+            cursor: "pointer",
+            fontSize: 11,
+            fontFamily: "monospace",
+            minWidth: 28,
+          }}
+        >
+          {paused ? "▶" : "‖"}
+        </button>
+      </div>
+    </label>
+  );
+};
+
 const SettingsPanel = ({
   fogDensity,
   onFogDensity,
@@ -43,6 +115,9 @@ const SettingsPanel = ({
   strategy,
   onStrategy,
   strategies,
+  timeRef,
+  paused,
+  onPausedChange,
 }: Props) => (
   <div
     style={{
@@ -60,7 +135,7 @@ const SettingsPanel = ({
       display: "flex",
       flexDirection: "column",
       gap: 10,
-      minWidth: 180,
+      minWidth: 200,
       userSelect: "none",
     }}
   >
@@ -102,6 +177,11 @@ const SettingsPanel = ({
       </div>
     </div>
 
+    <TimeOfDaySlider
+      timeRef={timeRef}
+      paused={paused}
+      onPausedChange={onPausedChange}
+    />
     <Slider label="Fog density" value={fogDensity} onChange={onFogDensity} />
     <Slider
       label="View distance"

@@ -19,6 +19,17 @@ export const ORBIT_MAX_POLAR_ANGLE = Math.PI / 3;
 // Height of the orbit target above terrain (roughly character eye level)
 export const CAMERA_TARGET_HEIGHT = 0.75;
 
+// Real-world seconds for one full day/night revolution. 4 minutes is fast
+// enough that a casual visitor sees the cycle in one session but slow enough
+// that noon doesn't whip past.
+export const DAY_LENGTH_SECONDS = 240;
+// Time-of-day in [0, 1) where 0.5 = solar noon. Start at noon so the very
+// first frame after page load is bright and readable, not midnight.
+export const INITIAL_TIME_OF_DAY = 0.5;
+// Distance from origin used to position the directional light along its arc.
+// Just needs to be large enough that the light reads as a parallel source.
+export const SUN_DISTANCE = 200;
+
 export const TERRAIN_TILE_SIZE = 720;
 export const TERRAIN_SEGMENTS = 128;
 export const TERRAIN_HEIGHT_SCALE = 16;

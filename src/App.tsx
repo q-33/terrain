@@ -15,17 +15,20 @@ import {
   CAMERA_FOV,
   CAMERA_INITIAL_POSITION,
   CAMERA_NEAR,
+  INITIAL_TIME_OF_DAY,
   ORBIT_DAMPING_FACTOR,
   ORBIT_MAX_DISTANCE,
   ORBIT_MAX_POLAR_ANGLE,
   ORBIT_MIN_DISTANCE,
   ORBIT_MIN_POLAR_ANGLE,
 } from "./constants";
+import { makeDayNightSample, samplePalette } from "./dayNight";
 
 type OrbitControlsImpl = OrbitControlsBase;
 import Terrain from "./Terrain";
 import SettingsPanel from "./SettingsPanel";
 import CameraStateSync from "./CameraStateSync";
+import DayNightCycle from "./DayNightCycle";
 import Gizmo from "./characters/Gizmo";
 import GizmoModel from "./characters/GizmoModel";
 import GizmoMovement from "./characters/GizmoMovement";
@@ -220,6 +223,8 @@ const TerrainView = ({ characterId, onCharacterChange }: TerrainViewProps) => {
     initialStrategy.defaultViewDistance,
   );
   const [strategy, setStrategy] = useState<TerrainStrategy>(initialStrategy);
+  const timeRef = useRef(INITIAL_TIME_OF_DAY);
+  const [paused, setPaused] = useState(false);
 
   // Write seed + strategy back to the URL on every strategy change. `immediate`
   // because strategy switches are discrete user actions, not per-frame state.
@@ -239,13 +244,9 @@ const TerrainView = ({ characterId, onCharacterChange }: TerrainViewProps) => {
     fogRef.current.far = far;
   }, [fogDensity, viewDistance]);
 
+  // DayNightCycle owns scene.background and scene.fog.color now — strategy
+  // changes only need to reset the fog distance sliders to the new defaults.
   useEffect(() => {
-    if (sceneRef.current) {
-      (sceneRef.current.background as Color).set(strategy.skyColor);
-    }
-    if (fogRef.current) {
-      fogRef.current.color.set(strategy.fogColor);
-    }
     setFogDensity(strategy.defaultFogDensity);
     setViewDistance(strategy.defaultViewDistance);
   }, [strategy]);
@@ -262,9 +263,13 @@ const TerrainView = ({ characterId, onCharacterChange }: TerrainViewProps) => {
         gl={{ antialias: true }}
         onCreated={({ scene }) => {
           sceneRef.current = scene;
-          scene.background = new Color(strategy.skyColor);
+          // Initial sky + fog colors sampled from the palette at start time —
+          // DayNightCycle takes over and keeps them updated from frame 1.
+          const init = makeDayNightSample();
+          samplePalette(strategy.dayPalette, INITIAL_TIME_OF_DAY, init);
+          scene.background = new Color().copy(init.sky);
           const [near, far] = fogNearFar(fogDensity, viewDistance);
-          const fog = new Fog(strategy.fogColor, near, far);
+          const fog = new Fog(init.fog.getHex(), near, far);
           scene.fog = fog;
           fogRef.current = fog;
         }}
@@ -275,9 +280,7 @@ const TerrainView = ({ characterId, onCharacterChange }: TerrainViewProps) => {
             <PerfOverlay position="top-left" />
           </Suspense>
         )}
-        <ambientLight intensity={0.45} />
-        <directionalLight position={[60, 80, 40]} intensity={1.6} />
-        <hemisphereLight args={["#a8d0e6", "#6b8e4e", 0.5]} />
+        <DayNightCycle strategy={strategy} timeRef={timeRef} paused={paused} />
 
         <OrbitControls
           ref={controlsRef}
@@ -377,6 +380,9 @@ const TerrainView = ({ characterId, onCharacterChange }: TerrainViewProps) => {
         strategy={strategy}
         onStrategy={setStrategy}
         strategies={ALL_STRATEGIES}
+        timeRef={timeRef}
+        paused={paused}
+        onPausedChange={setPaused}
       />
     </>
   );
