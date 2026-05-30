@@ -1,25 +1,21 @@
 import { Vec3 } from "./types";
 
-export const KEYBOARD_MOVE_SPEED = 0.12;
-export const KEYBOARD_TURN_SPEED = 0.01;
-
 // Camera setup. Initial y sits just above voxel sea level so the first
-// frame lands above water; GizmoMovement re-locks to character height
+// frame lands above water; PlayerController re-locks to surface height
 // within one frame after that.
-export const CAMERA_FOV = 60;
+export const CAMERA_FOV = 75;
 export const CAMERA_NEAR = 0.1;
 export const CAMERA_FAR = 700;
-export const CAMERA_INITIAL_POSITION: Vec3 = [0, 70, 18];
+export const CAMERA_INITIAL_POSITION: Vec3 = [0, 70, 0];
 
-// Orbit constraints
-export const ORBIT_MIN_DISTANCE = 2;
-export const ORBIT_MAX_DISTANCE = 80;
-export const ORBIT_DAMPING_FACTOR = 0.06;
-export const ORBIT_MIN_POLAR_ANGLE = Math.PI / 8;
-export const ORBIT_MAX_POLAR_ANGLE = Math.PI / 3;
-
-// Height of the orbit target above terrain (roughly character eye level)
-export const CAMERA_TARGET_HEIGHT = 0.75;
+// Player movement — units per second so motion is framerate-independent.
+// Minecraft's walking speed is ~4.3 m/s; we run a touch faster because
+// our voxels are 1 unit per cube and exploration feels sluggish at 4.
+export const PLAYER_MOVE_SPEED = 6;
+export const PLAYER_JUMP_SPEED = 8;
+export const PLAYER_GRAVITY = 22;
+// Eye height above the player's feet (feet sit at surface+1).
+export const PLAYER_EYE_HEIGHT = 1.6;
 
 // Distance from origin used to position the directional light along its arc.
 // Just needs to be large enough that the light reads as a parallel source.

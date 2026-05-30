@@ -1,10 +1,7 @@
 import { useRef, useState, useEffect, useMemo, Suspense, lazy } from "react";
-import { useThree } from "@react-three/fiber";
-import { Routes, Route, useNavigate } from "react-router-dom";
-import { Canvas } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
-import { Color, Fog, Group, Scene } from "three";
-import { OrbitControls as OrbitControlsBase } from "three-stdlib";
+import { useThree, Canvas } from "@react-three/fiber";
+import { PointerLockControls } from "@react-three/drei";
+import { Color, Fog } from "three";
 import {
   earthStrategy,
   ALL_STRATEGIES,
@@ -15,32 +12,18 @@ import {
   CAMERA_FOV,
   CAMERA_INITIAL_POSITION,
   CAMERA_NEAR,
-  ORBIT_DAMPING_FACTOR,
-  ORBIT_MAX_DISTANCE,
-  ORBIT_MAX_POLAR_ANGLE,
-  ORBIT_MIN_DISTANCE,
-  ORBIT_MIN_POLAR_ANGLE,
 } from "./constants";
 import {
   makeDayNightSample,
   samplePalette,
   wallClockTimeOfDay,
 } from "./dayNight";
-
-type OrbitControlsImpl = OrbitControlsBase;
 import VoxelWorld from "./voxel/VoxelWorld";
+import PlayerController from "./voxel/PlayerController";
 import SettingsPanel from "./SettingsPanel";
-import CameraStateSync from "./CameraStateSync";
 import DayNightCycle from "./DayNightCycle";
-import Gizmo from "./characters/Gizmo";
-import GizmoModel from "./characters/GizmoModel";
-import GizmoMovement from "./characters/GizmoMovement";
 import { readUrlState, writeUrlState } from "./urlState";
 import { getSeed } from "./noise";
-
-// Lazy so the /characters route doesn't pay for its three-stdlib + GLB loader
-// surface area in the main terrain bundle.
-const CharacterViewer = lazy(() => import("./CharacterViewer"));
 
 // Read once at module load; the overlay is a dev/debug aid, not reactive.
 const debugEnabled =
@@ -53,13 +36,6 @@ const PerfOverlay = lazy(() =>
   import("r3f-perf").then((m) => ({ default: m.Perf })),
 );
 
-export type CharacterId = "model" | "builtin";
-
-export const CHARACTER_OPTIONS: { id: CharacterId; label: string }[] = [
-  { id: "builtin", label: "Gizmo · built-in" },
-  { id: "model", label: "Gizmo · model" },
-];
-
 // viewDistance 0–100 → fog.far (40–650)
 // fogDensity   0–100 → fog.near as fraction of far (0%=thin, 100%=thick)
 const fogNearFar = (
@@ -71,143 +47,22 @@ const fogNearFar = (
   return [near, far];
 };
 
-const SELECT_STYLE: React.CSSProperties = {
-  background: "rgba(0,0,0,0.45)",
-  border: "1px solid rgba(255,255,255,0.18)",
-  color: "rgba(255,255,255,0.82)",
-  fontSize: 12,
-  fontFamily: "monospace",
-  padding: "5px 24px 5px 10px",
-  borderRadius: 8,
-  cursor: "pointer",
-  letterSpacing: "0.04em",
-  outline: "none",
-  appearance: "none" as const,
-  WebkitAppearance: "none" as const,
-};
-
-const SELECT_ARROW_STYLE: React.CSSProperties = {
-  position: "absolute",
-  right: 8,
-  top: "50%",
-  transform: "translateY(-50%)",
-  pointerEvents: "none",
-  color: "rgba(255,255,255,0.4)",
-  fontSize: 10,
-  lineHeight: "1",
-};
-
-type SelectFieldProps = {
-  value: string;
-  onChange: (value: string) => void;
-  wrapperStyle?: React.CSSProperties;
-  children: React.ReactNode;
-};
-
-export const SelectField = ({
-  value,
-  onChange,
-  wrapperStyle,
-  children,
-}: SelectFieldProps) => (
-  <div
-    style={{ position: "relative", display: "inline-block", ...wrapperStyle }}
-  >
-    <select
-      style={SELECT_STYLE}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-    >
-      {children}
-    </select>
-    <span style={SELECT_ARROW_STYLE}>▾</span>
-  </div>
-);
-
-// OrbitControls always calls preventDefault() on contextmenu, suppressing the
-// browser's right-click menu. Intercept in capture phase before it can, and
-// call stopImmediatePropagation() so OrbitControls' listener never fires.
+// PointerLockControls calls preventDefault() on contextmenu (right-click),
+// which we want to repurpose for placing blocks later. For now, just stop
+// the browser menu from appearing when the user right-clicks during play.
 const AllowContextMenu = () => {
   const { gl } = useThree();
   useEffect(() => {
     const el = gl.domElement;
-    const handler = (e: Event) => e.stopImmediatePropagation();
-    el.addEventListener("contextmenu", handler, { capture: true });
-    return () =>
-      el.removeEventListener("contextmenu", handler, { capture: true });
+    const handler = (e: Event) => e.preventDefault();
+    el.addEventListener("contextmenu", handler);
+    return () => el.removeEventListener("contextmenu", handler);
   }, [gl]);
   return null;
 };
 
 const App = () => {
-  const [characterId, setCharacterId] = useState<CharacterId>("builtin");
-
-  return (
-    <Routes>
-      <Route
-        path="/"
-        element={
-          <TerrainView
-            characterId={characterId}
-            onCharacterChange={setCharacterId}
-          />
-        }
-      />
-      <Route
-        path="/characters"
-        element={
-          <Suspense fallback={null}>
-            <CharacterViewer
-              characterId={characterId}
-              onCharacterChange={setCharacterId}
-            />
-          </Suspense>
-        }
-      />
-    </Routes>
-  );
-};
-
-type ActiveCharacterProps = {
-  gizmoRef: React.RefObject<Group | null>;
-  movingRef: React.RefObject<boolean>;
-  jumpingRef: React.RefObject<boolean>;
-  characterId: CharacterId;
-};
-
-const ActiveCharacter = ({
-  gizmoRef,
-  movingRef,
-  jumpingRef,
-  characterId,
-}: ActiveCharacterProps) => {
-  if (characterId === "model") {
-    return (
-      <Suspense fallback={null}>
-        <GizmoModel
-          ref={gizmoRef}
-          movingRef={movingRef}
-          jumpingRef={jumpingRef}
-        />
-      </Suspense>
-    );
-  }
-  return <Gizmo ref={gizmoRef} movingRef={movingRef} jumpingRef={jumpingRef} />;
-};
-
-type TerrainViewProps = {
-  characterId: CharacterId;
-  onCharacterChange: (id: CharacterId) => void;
-};
-
-const TerrainView = ({ characterId, onCharacterChange }: TerrainViewProps) => {
-  const navigate = useNavigate();
-  const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const fogRef = useRef<Fog | null>(null);
-  const sceneRef = useRef<Scene | null>(null);
-  const gizmoRef = useRef<Group | null>(null);
-  const movingRef = useRef(false);
-  const jumpingRef = useRef(false);
   const initialUrlState = useMemo(() => readUrlState(), []);
   const initialStrategy = useMemo(() => {
     const requested = initialUrlState.strategy?.toLowerCase();
@@ -228,9 +83,8 @@ const TerrainView = ({ characterId, onCharacterChange }: TerrainViewProps) => {
   const [strategy, setStrategy] = useState<TerrainStrategy>(initialStrategy);
   const timeRef = useRef(wallClockTimeOfDay());
   const [paused, setPaused] = useState(false);
+  const [pointerLocked, setPointerLocked] = useState(false);
 
-  // Write seed + strategy back to the URL on every strategy change. `immediate`
-  // because strategy switches are discrete user actions, not per-frame state.
   useEffect(() => {
     writeUrlState(
       { seed: getSeed(), strategy: strategy.name.toLowerCase() },
@@ -265,9 +119,6 @@ const TerrainView = ({ characterId, onCharacterChange }: TerrainViewProps) => {
         }}
         gl={{ antialias: true }}
         onCreated={({ scene }) => {
-          sceneRef.current = scene;
-          // Initial sky + fog colors sampled from the palette at start time —
-          // DayNightCycle takes over and keeps them updated from frame 1.
           const init = makeDayNightSample();
           samplePalette(strategy.dayPalette, wallClockTimeOfDay(), init);
           scene.background = new Color().copy(init.sky);
@@ -284,96 +135,36 @@ const TerrainView = ({ characterId, onCharacterChange }: TerrainViewProps) => {
           </Suspense>
         )}
         <DayNightCycle strategy={strategy} timeRef={timeRef} paused={paused} />
-
-        <OrbitControls
-          ref={controlsRef}
-          enableDamping
-          dampingFactor={ORBIT_DAMPING_FACTOR}
-          minDistance={ORBIT_MIN_DISTANCE}
-          maxDistance={ORBIT_MAX_DISTANCE}
-          minPolarAngle={ORBIT_MIN_POLAR_ANGLE}
-          maxPolarAngle={ORBIT_MAX_POLAR_ANGLE}
-          enableKeys={false}
-          enablePan={false}
+        <PointerLockControls
+          onLock={() => setPointerLocked(true)}
+          onUnlock={() => setPointerLocked(false)}
         />
-        <CameraStateSync
-          controlsRef={controlsRef}
+        <PlayerController
           initialX={initialUrlState.x}
           initialZ={initialUrlState.z}
-        />
-        <GizmoMovement
-          controlsRef={controlsRef}
-          gizmoRef={gizmoRef}
-          movingRef={movingRef}
-          jumpingRef={jumpingRef}
-        />
-        <ActiveCharacter
-          gizmoRef={gizmoRef}
-          movingRef={movingRef}
-          jumpingRef={jumpingRef}
-          characterId={characterId}
         />
         <VoxelWorld />
       </Canvas>
 
-      <div
-        style={{
-          position: "fixed",
-          bottom: 16,
-          left: "50%",
-          transform: "translateX(-50%)",
-          color: "rgba(255,255,255,0.7)",
-          fontSize: 12,
-          fontFamily: "monospace",
-          background: "rgba(0,0,0,0.35)",
-          padding: "6px 14px",
-          borderRadius: 8,
-          pointerEvents: "none",
-          userSelect: "none",
-          whiteSpace: "nowrap",
-        }}
-      >
-        ↑↓ move &nbsp;|&nbsp; ←→ turn &nbsp;|&nbsp; space — jump &nbsp;|&nbsp;
-        drag — orbit &nbsp;|&nbsp; scroll — zoom
-      </div>
-
-      <div
-        style={{
-          position: "fixed",
-          top: 16,
-          right: 16,
-          display: "flex",
-          gap: 8,
-          alignItems: "center",
-        }}
-      >
-        <SelectField
-          value={characterId}
-          onChange={(v) => onCharacterChange(v as CharacterId)}
-        >
-          {CHARACTER_OPTIONS.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.label}
-            </option>
-          ))}
-        </SelectField>
-        <button
+      {!pointerLocked && (
+        <div
           style={{
+            position: "fixed",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
             background: "rgba(0,0,0,0.45)",
-            border: "1px solid rgba(255,255,255,0.18)",
-            color: "rgba(255,255,255,0.82)",
-            fontSize: 12,
+            color: "rgba(255,255,255,0.92)",
             fontFamily: "monospace",
-            padding: "6px 14px",
-            borderRadius: 8,
-            cursor: "pointer",
+            fontSize: 16,
+            pointerEvents: "none",
             letterSpacing: "0.04em",
           }}
-          onClick={() => navigate("/characters")}
         >
-          characters →
-        </button>
-      </div>
+          click to play · WASD move · space jump · esc release
+        </div>
+      )}
 
       <SettingsPanel
         fogDensity={fogDensity}
