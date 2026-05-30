@@ -30,7 +30,8 @@
       "Bash(pnpm exec *)",
       "Bash(pnpm prettier:write *)",
       "Bash(echo \"PID $!\")",
-      "Bash(xargs cat *)"
+      "Bash(xargs cat *)",
+      "Bash(git *)"
     ]
   }
 }

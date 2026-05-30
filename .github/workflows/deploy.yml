@@ -23,6 +23,8 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+        env:
+          PNPM_ALLOW_ALL_BUILDS: "true"
       - run: pnpm build
 
       - uses: peaceiris/actions-gh-pages@v4
