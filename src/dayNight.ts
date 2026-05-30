@@ -106,3 +106,16 @@ export const sunPositionAt = (
   const phi = (t - 0.25) * Math.PI * 2;
   out.set(radius * Math.cos(phi), radius * Math.sin(phi), radius * 0.3);
 };
+
+// The player's local wall-clock time mapped into [0, 1) where 0 = local
+// midnight, 0.5 = local solar noon. Used so the in-world sun matches the
+// real world outside the user's window.
+export const wallClockTimeOfDay = (): number => {
+  const now = new Date();
+  const seconds =
+    now.getHours() * 3600 +
+    now.getMinutes() * 60 +
+    now.getSeconds() +
+    now.getMilliseconds() / 1000;
+  return seconds / 86400;
+};

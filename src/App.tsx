@@ -15,14 +15,17 @@ import {
   CAMERA_FOV,
   CAMERA_INITIAL_POSITION,
   CAMERA_NEAR,
-  INITIAL_TIME_OF_DAY,
   ORBIT_DAMPING_FACTOR,
   ORBIT_MAX_DISTANCE,
   ORBIT_MAX_POLAR_ANGLE,
   ORBIT_MIN_DISTANCE,
   ORBIT_MIN_POLAR_ANGLE,
 } from "./constants";
-import { makeDayNightSample, samplePalette } from "./dayNight";
+import {
+  makeDayNightSample,
+  samplePalette,
+  wallClockTimeOfDay,
+} from "./dayNight";
 
 type OrbitControlsImpl = OrbitControlsBase;
 import Terrain from "./Terrain";
@@ -223,7 +226,7 @@ const TerrainView = ({ characterId, onCharacterChange }: TerrainViewProps) => {
     initialStrategy.defaultViewDistance,
   );
   const [strategy, setStrategy] = useState<TerrainStrategy>(initialStrategy);
-  const timeRef = useRef(INITIAL_TIME_OF_DAY);
+  const timeRef = useRef(wallClockTimeOfDay());
   const [paused, setPaused] = useState(false);
 
   // Write seed + strategy back to the URL on every strategy change. `immediate`
@@ -266,7 +269,7 @@ const TerrainView = ({ characterId, onCharacterChange }: TerrainViewProps) => {
           // Initial sky + fog colors sampled from the palette at start time —
           // DayNightCycle takes over and keeps them updated from frame 1.
           const init = makeDayNightSample();
-          samplePalette(strategy.dayPalette, INITIAL_TIME_OF_DAY, init);
+          samplePalette(strategy.dayPalette, wallClockTimeOfDay(), init);
           scene.background = new Color().copy(init.sky);
           const [near, far] = fogNearFar(fogDensity, viewDistance);
           const fog = new Fog(init.fog.getHex(), near, far);

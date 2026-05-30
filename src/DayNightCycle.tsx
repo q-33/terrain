@@ -2,8 +2,13 @@ import { useRef, useMemo, RefObject } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { TerrainStrategy } from "./TerrainStrategy";
-import { DAY_LENGTH_SECONDS, SUN_DISTANCE } from "./constants";
-import { makeDayNightSample, samplePalette, sunPositionAt } from "./dayNight";
+import { SUN_DISTANCE } from "./constants";
+import {
+  makeDayNightSample,
+  samplePalette,
+  sunPositionAt,
+  wallClockTimeOfDay,
+} from "./dayNight";
 
 type Props = {
   strategy: TerrainStrategy;
@@ -20,13 +25,12 @@ const DayNightCycle = ({ strategy, timeRef, paused }: Props) => {
   const sampled = useMemo(() => makeDayNightSample(), []);
   const sunPos = useMemo(() => new THREE.Vector3(), []);
 
-  useFrame((_, delta) => {
+  useFrame(() => {
+    // When live, time tracks the user's wall clock so the in-world sun
+    // matches the sun outside their window. Pause to freeze, scrub the
+    // slider to look around (the slider auto-pauses when dragged).
     if (!paused) {
-      let next = timeRef.current + delta / DAY_LENGTH_SECONDS;
-      if (next >= 1) {
-        next -= Math.floor(next);
-      }
-      timeRef.current = next;
+      timeRef.current = wallClockTimeOfDay();
     }
     const t = timeRef.current;
 

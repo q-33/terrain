@@ -82,6 +82,11 @@ const TimeOfDaySlider = ({
             const v = Number(e.target.value);
             timeRef.current = v;
             setDisplay(v);
+            // Dragging the slider snapshots time — without auto-pause, the
+            // wall-clock driver in DayNightCycle would yank it back next frame.
+            if (!paused) {
+              onPausedChange(true);
+            }
           }}
           style={{ flex: 1, accentColor: "#8fb4c8", cursor: "pointer" }}
         />
