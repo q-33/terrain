@@ -20,7 +20,7 @@ const gradients: Vec3[] = [
 // Doubled permutation table (512 entries) to avoid index wrapping in lookups.
 const permutationTable = new Uint8Array(512);
 
-const buildPermutationTable = (seed = 42): void => {
+const buildPermutationTable = (seed: number): void => {
   const shuffled = new Uint8Array(256);
   for (let i = 0; i < 256; i++) {
     shuffled[i] = i;
@@ -37,7 +37,28 @@ const buildPermutationTable = (seed = 42): void => {
   }
 };
 
-buildPermutationTable();
+const DEFAULT_SEED = 42;
+
+// Read seed from URL hash at module init so Terrain.tsx's geometry on first
+// render uses the right permutation. Done inline (rather than importing from
+// urlState.ts) to keep this module self-contained and side-effect-only.
+const readInitialSeed = (): number => {
+  if (typeof window === "undefined") {
+    return DEFAULT_SEED;
+  }
+  const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const raw = params.get("s");
+  if (raw === null) {
+    return DEFAULT_SEED;
+  }
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : DEFAULT_SEED;
+};
+
+let activeSeed = readInitialSeed();
+buildPermutationTable(activeSeed);
+
+export const getSeed = (): number => activeSeed;
 
 const dotWithGradient = (gradient: Vec3, x: number, y: number): number =>
   gradient[0] * x + gradient[1] * y;

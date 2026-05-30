@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, Suspense, lazy } from "react";
+import { useRef, useState, useEffect, useMemo, Suspense, lazy } from "react";
 import { useThree } from "@react-three/fiber";
 import { Routes, Route, useNavigate } from "react-router-dom";
 import { Canvas } from "@react-three/fiber";
@@ -25,9 +25,12 @@ import {
 type OrbitControlsImpl = OrbitControlsBase;
 import Terrain from "./Terrain";
 import SettingsPanel from "./SettingsPanel";
+import CameraStateSync from "./CameraStateSync";
 import Gizmo from "./characters/Gizmo";
 import GizmoModel from "./characters/GizmoModel";
 import GizmoMovement from "./characters/GizmoMovement";
+import { readUrlState, writeUrlState } from "./urlState";
+import { getSeed } from "./noise";
 
 // Lazy so the /characters route doesn't pay for its three-stdlib + GLB loader
 // surface area in the main terrain bundle.
@@ -199,11 +202,33 @@ const TerrainView = ({ characterId, onCharacterChange }: TerrainViewProps) => {
   const gizmoRef = useRef<Group | null>(null);
   const movingRef = useRef(false);
   const jumpingRef = useRef(false);
-  const [fogDensity, setFogDensity] = useState(earthStrategy.defaultFogDensity);
-  const [viewDistance, setViewDistance] = useState(
-    earthStrategy.defaultViewDistance,
+  const initialUrlState = useMemo(() => readUrlState(), []);
+  const initialStrategy = useMemo(() => {
+    const requested = initialUrlState.strategy?.toLowerCase();
+    if (!requested) {
+      return earthStrategy;
+    }
+    return (
+      ALL_STRATEGIES.find((s) => s.name.toLowerCase() === requested) ??
+      earthStrategy
+    );
+  }, [initialUrlState.strategy]);
+  const [fogDensity, setFogDensity] = useState(
+    initialStrategy.defaultFogDensity,
   );
-  const [strategy, setStrategy] = useState<TerrainStrategy>(earthStrategy);
+  const [viewDistance, setViewDistance] = useState(
+    initialStrategy.defaultViewDistance,
+  );
+  const [strategy, setStrategy] = useState<TerrainStrategy>(initialStrategy);
+
+  // Write seed + strategy back to the URL on every strategy change. `immediate`
+  // because strategy switches are discrete user actions, not per-frame state.
+  useEffect(() => {
+    writeUrlState(
+      { seed: getSeed(), strategy: strategy.name.toLowerCase() },
+      true,
+    );
+  }, [strategy]);
 
   useEffect(() => {
     if (!fogRef.current) {
@@ -264,6 +289,11 @@ const TerrainView = ({ characterId, onCharacterChange }: TerrainViewProps) => {
           maxPolarAngle={ORBIT_MAX_POLAR_ANGLE}
           enableKeys={false}
           enablePan={false}
+        />
+        <CameraStateSync
+          controlsRef={controlsRef}
+          initialX={initialUrlState.x}
+          initialZ={initialUrlState.z}
         />
         <GizmoMovement
           controlsRef={controlsRef}
