@@ -1,5 +1,4 @@
 import { useMemo, useRef, useEffect } from "react";
-import { RGB } from "./types";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import {
@@ -16,10 +15,16 @@ import {
 import { fractalNoise } from "./noise";
 import { TerrainStrategy } from "./TerrainStrategy";
 
-// Tile large enough that fog always hides the edge:
-// TERRAIN_TILE_SIZE/2 - TERRAIN_REGEN_DISTANCE > fog far  →  360 - 120 = 240 < 650 max
-// Keep fog view distance slider below ~35% when at tile edge or increase SIZE further.
-const VERT_COUNT = TERRAIN_SEGMENTS * TERRAIN_SEGMENTS * 6; // 2 tris × 3 verts per quad
+// Indexed grid: (SEG+1)² shared vertices, SEG²·6 indices. Sharing vertices
+// is what makes smooth shading possible — every interior vertex is hit by 6
+// triangles, so `computeVertexNormals` produces a single averaged normal.
+//
+// Tile is large enough that fog always hides the regenerated edge:
+//   TERRAIN_TILE_SIZE/2 - TERRAIN_REGEN_DISTANCE = 240, fog far max = 650.
+// Keep the view-distance slider below ~35% near a tile boundary or grow SIZE.
+const VERT_PER_ROW = TERRAIN_SEGMENTS + 1;
+const VERT_COUNT = VERT_PER_ROW * VERT_PER_ROW;
+const INDEX_COUNT = TERRAIN_SEGMENTS * TERRAIN_SEGMENTS * 6;
 
 const sampleTerrainHeight = (worldX: number, worldZ: number): number =>
   fractalNoise(
@@ -30,81 +35,178 @@ const sampleTerrainHeight = (worldX: number, worldZ: number): number =>
     TERRAIN_NOISE_GAIN,
   ) * TERRAIN_HEIGHT_SCALE;
 
-// Writes a single vertex (position + color) into the flat buffer arrays at slot i.
-const writeVertex = (
+const populateTerrainPositions = (
   positions: Float32Array,
-  colors: Float32Array,
-  i: number,
-  x: number,
-  y: number,
-  z: number,
-  color: RGB,
-): void => {
-  positions[i * 3] = x;
-  positions[i * 3 + 1] = y;
-  positions[i * 3 + 2] = z;
-  colors[i * 3] = color[0];
-  colors[i * 3 + 1] = color[1];
-  colors[i * 3 + 2] = color[2];
-};
-
-// Samples height at all four corners of each quad, then writes two triangles
-// (CCW winding from above so normals point up) with flat per-face colors into
-// the pre-allocated position and color GPU buffers.
-const populateTerrainBuffers = (
-  positions: Float32Array,
-  colors: Float32Array,
   centerX: number,
   centerZ: number,
-  strategy: TerrainStrategy,
 ): void => {
   const quadSize = TERRAIN_TILE_SIZE / TERRAIN_SEGMENTS;
   const originX = centerX - TERRAIN_TILE_SIZE / 2;
   const originZ = centerZ - TERRAIN_TILE_SIZE / 2;
-  let vertexIndex = 0;
-
-  for (let row = 0; row < TERRAIN_SEGMENTS; row++) {
-    for (let col = 0; col < TERRAIN_SEGMENTS; col++) {
-      const x0 = originX + col * quadSize;
-      const z0 = originZ + row * quadSize;
-      const x1 = x0 + quadSize;
-      const z1 = z0 + quadSize;
-
-      const h00 = sampleTerrainHeight(x0, z0);
-      const h10 = sampleTerrainHeight(x1, z0);
-      const h01 = sampleTerrainHeight(x0, z1);
-      const h11 = sampleTerrainHeight(x1, z1);
-
-      // Darken steep faces to give a textured relief effect
-      const slope1 = Math.min(
-        1,
-        (Math.abs(h10 - h00) + Math.abs(h01 - h00)) * 0.1,
-      );
-      const slope2 = Math.min(
-        1,
-        (Math.abs(h11 - h10) + Math.abs(h11 - h01)) * 0.1,
-      );
-      const dim = (c: RGB, t: number): RGB => [c[0] * t, c[1] * t, c[2] * t];
-      const colorTri1 = dim(
-        strategy.colorForHeight((h00 + h10 + h01) / 3),
-        1 - slope1 * 0.3,
-      );
-      const colorTri2 = dim(
-        strategy.colorForHeight((h10 + h11 + h01) / 3),
-        1 - slope2 * 0.3,
-      );
-
-      // Triangle 1: top-left, bottom-left, top-right
-      writeVertex(positions, colors, vertexIndex++, x0, h00, z0, colorTri1);
-      writeVertex(positions, colors, vertexIndex++, x0, h01, z1, colorTri1);
-      writeVertex(positions, colors, vertexIndex++, x1, h10, z0, colorTri1);
-
-      // Triangle 2: top-right, bottom-left, bottom-right
-      writeVertex(positions, colors, vertexIndex++, x1, h10, z0, colorTri2);
-      writeVertex(positions, colors, vertexIndex++, x0, h01, z1, colorTri2);
-      writeVertex(positions, colors, vertexIndex++, x1, h11, z1, colorTri2);
+  let i = 0;
+  for (let row = 0; row < VERT_PER_ROW; row++) {
+    const z = originZ + row * quadSize;
+    for (let col = 0; col < VERT_PER_ROW; col++) {
+      const x = originX + col * quadSize;
+      positions[i] = x;
+      positions[i + 1] = sampleTerrainHeight(x, z);
+      positions[i + 2] = z;
+      i += 3;
     }
   }
+};
+
+const buildIndices = (): Uint16Array | Uint32Array => {
+  const buf =
+    VERT_COUNT > 65535
+      ? new Uint32Array(INDEX_COUNT)
+      : new Uint16Array(INDEX_COUNT);
+  let i = 0;
+  for (let row = 0; row < TERRAIN_SEGMENTS; row++) {
+    for (let col = 0; col < TERRAIN_SEGMENTS; col++) {
+      const a = row * VERT_PER_ROW + col;
+      const b = a + 1;
+      const c = a + VERT_PER_ROW;
+      const d = c + 1;
+      // CCW winding from above (Y up) so normals point up after computeVertexNormals.
+      buf[i++] = a;
+      buf[i++] = c;
+      buf[i++] = b;
+      buf[i++] = b;
+      buf[i++] = c;
+      buf[i++] = d;
+    }
+  }
+  return buf;
+};
+
+// GLSL prelude injected into the fragment shader. Provides the varying, the
+// strategy uniforms, and the small noise/triplanar helpers used by the color
+// block. Two-octave value noise is plenty for surface texture and stays cheap.
+const FRAGMENT_PRELUDE = /* glsl */ `
+varying vec3 vWorldPos;
+uniform vec3 uBiomeColors[5];
+uniform float uBiomeHeights[4];
+uniform vec3 uRockColor;
+uniform float uBlendRange;
+uniform float uDetailScale;
+uniform float uDetailStrength;
+
+float terrainHash21(vec2 p) {
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}
+
+float terrainValueNoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  float a = terrainHash21(i);
+  float b = terrainHash21(i + vec2(1.0, 0.0));
+  float c = terrainHash21(i + vec2(0.0, 1.0));
+  float d = terrainHash21(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+float terrainFbm2(vec2 p) {
+  float v = 0.0;
+  float a = 0.5;
+  for (int i = 0; i < 2; i++) {
+    v += terrainValueNoise(p) * a;
+    p *= 2.07;
+    a *= 0.5;
+  }
+  return v;
+}
+
+// Sample fbm on three orthogonal planes and blend by |faceNormal| so cliffs
+// don't show vertically smeared XZ noise.
+float terrainTriplanar(vec3 wp, vec3 n) {
+  vec3 w = pow(abs(n), vec3(4.0));
+  w /= (w.x + w.y + w.z + 1e-5);
+  float nx = terrainFbm2(wp.yz * uDetailScale);
+  float ny = terrainFbm2(wp.xz * uDetailScale);
+  float nz = terrainFbm2(wp.xy * uDetailScale);
+  return nx * w.x + ny * w.y + nz * w.z;
+}
+`;
+
+// Replaces <color_fragment>. Writes the final diffuseColor.rgb that the rest
+// of the PBR pipeline (lights, fog, tonemap) then operates on — never touches
+// gl_FragColor directly. Slope is measured from screen-space derivatives of
+// vWorldPos so the rock blend stays sharp even though vertex normals are
+// smoothed for diffuse lighting.
+const FRAGMENT_COLOR_INJECT = /* glsl */ `
+float h = vWorldPos.y;
+vec3 col = uBiomeColors[0];
+col = mix(col, uBiomeColors[1], smoothstep(uBiomeHeights[0] - uBlendRange, uBiomeHeights[0] + uBlendRange, h));
+col = mix(col, uBiomeColors[2], smoothstep(uBiomeHeights[1] - uBlendRange, uBiomeHeights[1] + uBlendRange, h));
+col = mix(col, uBiomeColors[3], smoothstep(uBiomeHeights[2] - uBlendRange, uBiomeHeights[2] + uBlendRange, h));
+col = mix(col, uBiomeColors[4], smoothstep(uBiomeHeights[3] - uBlendRange, uBiomeHeights[3] + uBlendRange, h));
+
+vec3 dpdx = dFdx(vWorldPos);
+vec3 dpdy = dFdy(vWorldPos);
+vec3 faceNormal = normalize(cross(dpdx, dpdy));
+
+float n = terrainTriplanar(vWorldPos, faceNormal);
+float slope = 1.0 - abs(faceNormal.y);
+
+vec3 rock = uRockColor * (0.78 + n * 0.5);
+col = mix(col, rock, smoothstep(0.32, 0.62, slope));
+
+col *= 1.0 + (n - 0.5) * uDetailStrength;
+
+diffuseColor.rgb = col;
+`;
+
+type StrategyUniforms = {
+  uBiomeColors: { value: THREE.Vector3[] };
+  uBiomeHeights: { value: number[] };
+  uRockColor: { value: THREE.Vector3 };
+  uBlendRange: { value: number };
+  uDetailScale: { value: number };
+  uDetailStrength: { value: number };
+};
+
+const makeUniforms = (strategy: TerrainStrategy): StrategyUniforms => ({
+  uBiomeColors: {
+    value: strategy.biomeColors.map((c) => new THREE.Vector3(c[0], c[1], c[2])),
+  },
+  uBiomeHeights: { value: [...strategy.biomeHeights] },
+  uRockColor: {
+    value: new THREE.Vector3(
+      strategy.rockColor[0],
+      strategy.rockColor[1],
+      strategy.rockColor[2],
+    ),
+  },
+  uBlendRange: { value: strategy.blendRange },
+  uDetailScale: { value: strategy.detailScale },
+  uDetailStrength: { value: strategy.detailStrength },
+});
+
+// Mutate the existing uniform values in place so every compiled program
+// (Three may recompile when lights or fog change) reads the same references.
+const updateUniforms = (
+  uniforms: StrategyUniforms,
+  strategy: TerrainStrategy,
+): void => {
+  for (let i = 0; i < 5; i++) {
+    const c = strategy.biomeColors[i];
+    uniforms.uBiomeColors.value[i].set(c[0], c[1], c[2]);
+  }
+  for (let i = 0; i < 4; i++) {
+    uniforms.uBiomeHeights.value[i] = strategy.biomeHeights[i];
+  }
+  uniforms.uRockColor.value.set(
+    strategy.rockColor[0],
+    strategy.rockColor[1],
+    strategy.rockColor[2],
+  );
+  uniforms.uBlendRange.value = strategy.blendRange;
+  uniforms.uDetailScale.value = strategy.detailScale;
+  uniforms.uDetailStrength.value = strategy.detailStrength;
 };
 
 type TerrainProps = {
@@ -119,28 +221,48 @@ const Terrain = ({ strategy }: TerrainProps) => {
   const geo = useMemo(() => {
     const g = new THREE.BufferGeometry();
     const positions = new Float32Array(VERT_COUNT * 3);
-    const colors = new Float32Array(VERT_COUNT * 3);
-    populateTerrainBuffers(positions, colors, 0, 0, strategyRef.current);
+    populateTerrainPositions(positions, 0, 0);
     g.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    g.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    g.setIndex(new THREE.BufferAttribute(buildIndices(), 1));
     g.computeVertexNormals();
     return g;
   }, []);
 
-  // When strategy changes, repopulate only colors — positions are unchanged.
+  const material = useMemo(() => {
+    const initial = strategyRef.current;
+    const mat = new THREE.MeshStandardMaterial({
+      roughness: initial.roughness,
+      metalness: initial.metalness,
+    });
+    const uniforms = makeUniforms(initial);
+    mat.userData.uniforms = uniforms;
+
+    mat.onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, uniforms);
+      shader.vertexShader = shader.vertexShader
+        .replace(
+          "#include <common>",
+          `#include <common>\nvarying vec3 vWorldPos;`,
+        )
+        .replace(
+          "#include <begin_vertex>",
+          `#include <begin_vertex>\nvWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
+        );
+      shader.fragmentShader = shader.fragmentShader
+        .replace("#include <common>", `#include <common>\n${FRAGMENT_PRELUDE}`)
+        .replace("#include <color_fragment>", FRAGMENT_COLOR_INJECT);
+    };
+
+    return mat;
+  }, []);
+
   useEffect(() => {
     strategyRef.current = strategy;
-    const positions = geo.attributes.position.array as Float32Array;
-    const colors = geo.attributes.color.array as Float32Array;
-    populateTerrainBuffers(
-      positions,
-      colors,
-      center.current.x,
-      center.current.y,
-      strategy,
-    );
-    geo.attributes.color.needsUpdate = true;
-  }, [strategy, geo]);
+    const uniforms = material.userData.uniforms as StrategyUniforms;
+    updateUniforms(uniforms, strategy);
+    material.roughness = strategy.roughness;
+    material.metalness = strategy.metalness;
+  }, [strategy, material]);
 
   useFrame(() => {
     const cx = camera.position.x;
@@ -151,36 +273,19 @@ const Terrain = ({ strategy }: TerrainProps) => {
       return;
     }
 
-    // Snap to grid so the pop happens less often and never overlaps fog
+    // Snap so the pop happens less often and never overlaps with the fog band.
     const snappedX = Math.round(cx / TERRAIN_SNAP_GRID) * TERRAIN_SNAP_GRID;
     const snappedZ = Math.round(cz / TERRAIN_SNAP_GRID) * TERRAIN_SNAP_GRID;
     center.current.set(snappedX, snappedZ);
 
     const positions = geo.attributes.position.array as Float32Array;
-    const colors = geo.attributes.color.array as Float32Array;
-    populateTerrainBuffers(
-      positions,
-      colors,
-      snappedX,
-      snappedZ,
-      strategyRef.current,
-    );
+    populateTerrainPositions(positions, snappedX, snappedZ);
     geo.attributes.position.needsUpdate = true;
-    geo.attributes.color.needsUpdate = true;
     geo.computeVertexNormals();
     geo.computeBoundingSphere();
   });
 
-  return (
-    <mesh geometry={geo}>
-      <meshStandardMaterial
-        vertexColors
-        flatShading
-        roughness={strategy.roughness}
-        metalness={strategy.metalness}
-      />
-    </mesh>
-  );
+  return <mesh geometry={geo} material={material} />;
 };
 
 export default Terrain;

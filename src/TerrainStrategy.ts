@@ -1,5 +1,10 @@
 import { RGB } from "./types";
 
+// Five biome colors stacked low → high, separated by four transition heights.
+// The shader blends between adjacent layers using `smoothstep` with `blendRange`
+// so there are no hard bands. `rockColor` is mixed in on steep faces (slope is
+// measured per-pixel from screen-space derivatives of world position so the
+// blend stays sharp even though vertex normals are smoothed).
 export type TerrainStrategy = {
   name: string;
   skyColor: string;
@@ -8,7 +13,12 @@ export type TerrainStrategy = {
   defaultViewDistance: number;
   roughness: number;
   metalness: number;
-  colorForHeight: (height: number) => RGB;
+  biomeColors: readonly [RGB, RGB, RGB, RGB, RGB];
+  biomeHeights: readonly [number, number, number, number];
+  rockColor: RGB;
+  blendRange: number;
+  detailScale: number;
+  detailStrength: number;
 };
 
 export const earthStrategy: TerrainStrategy = {
@@ -17,23 +27,20 @@ export const earthStrategy: TerrainStrategy = {
   fogColor: "#8fb4c8",
   defaultFogDensity: 50,
   defaultViewDistance: 50,
-  roughness: 0.85,
+  roughness: 0.92,
   metalness: 0.0,
-  colorForHeight: (h) => {
-    if (h < -1.5) {
-      return [0.18, 0.35, 0.56]; // deep water
-    }
-    if (h < 0.5) {
-      return [0.76, 0.66, 0.42]; // sand
-    }
-    if (h < 5.0) {
-      return [0.29, 0.49, 0.35]; // grass
-    }
-    if (h < 9.0) {
-      return [0.42, 0.36, 0.31]; // rock
-    }
-    return [0.85, 0.9, 0.9]; // snow
-  },
+  biomeColors: [
+    [0.12, 0.28, 0.5], // deep water
+    [0.78, 0.68, 0.44], // sand
+    [0.24, 0.46, 0.3], // grass
+    [0.4, 0.34, 0.29], // soil / lower slope
+    [0.92, 0.95, 0.96], // snow
+  ],
+  biomeHeights: [-1.5, 0.6, 5.0, 9.0],
+  rockColor: [0.36, 0.33, 0.31],
+  blendRange: 1.4,
+  detailScale: 0.18,
+  detailStrength: 0.22,
 };
 
 export const marsStrategy: TerrainStrategy = {
@@ -42,23 +49,20 @@ export const marsStrategy: TerrainStrategy = {
   fogColor: "#c27040",
   defaultFogDensity: 65,
   defaultViewDistance: 35,
-  roughness: 0.95,
+  roughness: 0.97,
   metalness: 0.0,
-  colorForHeight: (h) => {
-    if (h < -4.0) {
-      return [0.2, 0.08, 0.06]; // crater floor
-    }
-    if (h < 0.0) {
-      return [0.5, 0.2, 0.11]; // rusty lowlands
-    }
-    if (h < 4.0) {
-      return [0.62, 0.32, 0.16]; // ochre plains
-    }
-    if (h < 7.5) {
-      return [0.7, 0.46, 0.3]; // dusty highlands
-    }
-    return [0.8, 0.66, 0.58]; // pale summit
-  },
+  biomeColors: [
+    [0.18, 0.07, 0.05], // crater floor
+    [0.5, 0.2, 0.11], // rusty lowlands
+    [0.64, 0.33, 0.16], // ochre plains
+    [0.74, 0.5, 0.32], // dusty highlands
+    [0.85, 0.72, 0.62], // pale summit
+  ],
+  biomeHeights: [-4.0, 0.0, 4.0, 7.5],
+  rockColor: [0.3, 0.16, 0.1],
+  blendRange: 1.6,
+  detailScale: 0.15,
+  detailStrength: 0.28,
 };
 
 export const oceanFloorStrategy: TerrainStrategy = {
@@ -67,23 +71,20 @@ export const oceanFloorStrategy: TerrainStrategy = {
   fogColor: "#07111f",
   defaultFogDensity: 75,
   defaultViewDistance: 25,
-  roughness: 0.4,
-  metalness: 0.15,
-  colorForHeight: (h) => {
-    if (h < -5.0) {
-      return [0.04, 0.04, 0.08]; // hadal trench
-    }
-    if (h < -1.5) {
-      return [0.07, 0.1, 0.18]; // abyssal plain
-    }
-    if (h < 2.0) {
-      return [0.15, 0.19, 0.28]; // continental slope
-    }
-    if (h < 6.0) {
-      return [0.26, 0.24, 0.23]; // seamount basalt
-    }
-    return [0.62, 0.52, 0.32]; // hydrothermal minerals
-  },
+  roughness: 0.55,
+  metalness: 0.18,
+  biomeColors: [
+    [0.03, 0.04, 0.07], // hadal trench
+    [0.07, 0.1, 0.18], // abyssal plain
+    [0.16, 0.2, 0.28], // continental slope
+    [0.26, 0.24, 0.23], // seamount basalt
+    [0.65, 0.54, 0.34], // hydrothermal minerals
+  ],
+  biomeHeights: [-5.0, -1.5, 2.0, 6.0],
+  rockColor: [0.18, 0.18, 0.2],
+  blendRange: 1.8,
+  detailScale: 0.22,
+  detailStrength: 0.18,
 };
 
 export const ALL_STRATEGIES: readonly TerrainStrategy[] = [
