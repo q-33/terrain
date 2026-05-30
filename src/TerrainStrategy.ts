@@ -1,27 +1,14 @@
-import { RGB } from "./types";
 import { DayNightPalette } from "./dayNight";
 
-// Five biome colors stacked low → high, separated by four transition heights.
-// The shader blends between adjacent layers using `smoothstep` with `blendRange`
-// so there are no hard bands. `rockColor` is mixed in on steep faces (slope is
-// measured per-pixel from screen-space derivatives of world position so the
-// blend stays sharp even though vertex normals are smoothed).
-//
-// `dayPalette` drives the day/night cycle — sky/fog/sun/ambient colors and
-// intensities at six keyframes through 24 in-game hours, lerped per frame.
-// See dayNight.ts for the keyframe shape and sampling rules.
+// A "world" preset — currently just naming, default fog distances, and the
+// day/night palette. Earth/Mars/Ocean used to carry biome shader uniforms
+// for the smooth-terrain renderer; with the voxel pivot those moved into
+// the world generator and block registry. The biome name still survives so
+// the URL and biome buttons keep working as a sky/fog mood toggle.
 export type TerrainStrategy = {
   name: string;
   defaultFogDensity: number;
   defaultViewDistance: number;
-  roughness: number;
-  metalness: number;
-  biomeColors: readonly [RGB, RGB, RGB, RGB, RGB];
-  biomeHeights: readonly [number, number, number, number];
-  rockColor: RGB;
-  blendRange: number;
-  detailScale: number;
-  detailStrength: number;
   dayPalette: DayNightPalette;
 };
 
@@ -98,20 +85,6 @@ export const earthStrategy: TerrainStrategy = {
   name: "Earth",
   defaultFogDensity: 50,
   defaultViewDistance: 50,
-  roughness: 0.92,
-  metalness: 0.0,
-  biomeColors: [
-    [0.12, 0.28, 0.5],
-    [0.78, 0.68, 0.44],
-    [0.24, 0.46, 0.3],
-    [0.4, 0.34, 0.29],
-    [0.92, 0.95, 0.96],
-  ],
-  biomeHeights: [-1.5, 0.6, 5.0, 9.0],
-  rockColor: [0.36, 0.33, 0.31],
-  blendRange: 1.4,
-  detailScale: 0.18,
-  detailStrength: 0.22,
   dayPalette: earthPalette,
 };
 
@@ -187,20 +160,6 @@ export const marsStrategy: TerrainStrategy = {
   name: "Mars",
   defaultFogDensity: 65,
   defaultViewDistance: 35,
-  roughness: 0.97,
-  metalness: 0.0,
-  biomeColors: [
-    [0.18, 0.07, 0.05],
-    [0.5, 0.2, 0.11],
-    [0.64, 0.33, 0.16],
-    [0.74, 0.5, 0.32],
-    [0.85, 0.72, 0.62],
-  ],
-  biomeHeights: [-4.0, 0.0, 4.0, 7.5],
-  rockColor: [0.3, 0.16, 0.1],
-  blendRange: 1.6,
-  detailScale: 0.15,
-  detailStrength: 0.28,
   dayPalette: marsPalette,
 };
 
@@ -277,20 +236,6 @@ export const oceanFloorStrategy: TerrainStrategy = {
   name: "Ocean Floor",
   defaultFogDensity: 75,
   defaultViewDistance: 25,
-  roughness: 0.55,
-  metalness: 0.18,
-  biomeColors: [
-    [0.03, 0.04, 0.07],
-    [0.07, 0.1, 0.18],
-    [0.16, 0.2, 0.28],
-    [0.26, 0.24, 0.23],
-    [0.65, 0.54, 0.34],
-  ],
-  biomeHeights: [-5.0, -1.5, 2.0, 6.0],
-  rockColor: [0.18, 0.18, 0.2],
-  blendRange: 1.8,
-  detailScale: 0.22,
-  detailStrength: 0.18,
   dayPalette: oceanFloorPalette,
 };
 

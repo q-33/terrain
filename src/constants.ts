@@ -3,11 +3,13 @@ import { Vec3 } from "./types";
 export const KEYBOARD_MOVE_SPEED = 0.12;
 export const KEYBOARD_TURN_SPEED = 0.01;
 
-// Camera setup — initial position gives ~10° downward pitch → ~1/3 sky at FOV 60
+// Camera setup. Initial y sits just above voxel sea level so the first
+// frame lands above water; GizmoMovement re-locks to character height
+// within one frame after that.
 export const CAMERA_FOV = 60;
 export const CAMERA_NEAR = 0.1;
 export const CAMERA_FAR = 700;
-export const CAMERA_INITIAL_POSITION: Vec3 = [0, 0.4, 14];
+export const CAMERA_INITIAL_POSITION: Vec3 = [0, 70, 18];
 
 // Orbit constraints
 export const ORBIT_MIN_DISTANCE = 2;
@@ -22,13 +24,3 @@ export const CAMERA_TARGET_HEIGHT = 0.75;
 // Distance from origin used to position the directional light along its arc.
 // Just needs to be large enough that the light reads as a parallel source.
 export const SUN_DISTANCE = 200;
-
-export const TERRAIN_TILE_SIZE = 720;
-export const TERRAIN_SEGMENTS = 128;
-export const TERRAIN_HEIGHT_SCALE = 16;
-export const TERRAIN_REGEN_DISTANCE = 120;
-export const TERRAIN_SNAP_GRID = 90;
-export const TERRAIN_NOISE_FREQUENCY = 0.018;
-export const TERRAIN_NOISE_OCTAVES = 5;
-export const TERRAIN_NOISE_LACUNARITY = 2.1;
-export const TERRAIN_NOISE_GAIN = 0.5;

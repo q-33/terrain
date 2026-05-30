@@ -28,7 +28,7 @@ import {
 } from "./dayNight";
 
 type OrbitControlsImpl = OrbitControlsBase;
-import Terrain from "./Terrain";
+import VoxelWorld from "./voxel/VoxelWorld";
 import SettingsPanel from "./SettingsPanel";
 import CameraStateSync from "./CameraStateSync";
 import DayNightCycle from "./DayNightCycle";
@@ -313,7 +313,7 @@ const TerrainView = ({ characterId, onCharacterChange }: TerrainViewProps) => {
           jumpingRef={jumpingRef}
           characterId={characterId}
         />
-        <Terrain strategy={strategy} />
+        <VoxelWorld />
       </Canvas>
 
       <div

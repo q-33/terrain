@@ -2,17 +2,12 @@ import { useRef, useEffect, RefObject } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { OrbitControls as OrbitControlsBase } from "three-stdlib";
-import { fractalNoise } from "../noise";
 import {
   CAMERA_TARGET_HEIGHT,
   KEYBOARD_MOVE_SPEED,
   KEYBOARD_TURN_SPEED,
-  TERRAIN_NOISE_FREQUENCY,
-  TERRAIN_NOISE_OCTAVES,
-  TERRAIN_NOISE_LACUNARITY,
-  TERRAIN_NOISE_GAIN,
-  TERRAIN_HEIGHT_SCALE,
 } from "../constants";
+import { worldSurfaceHeight } from "../voxel/worldGen";
 
 const JUMP_SPEED = 7;
 const GRAVITY = 20;
@@ -24,14 +19,12 @@ type Props = {
   jumpingRef: RefObject<boolean>;
 };
 
+// Voxel surface heights are integer y-coords of the topmost solid block.
+// The character sits on top of that block, so its base y is one above.
+// Math.floor handles the case where the character's continuous (x, z) lands
+// inside a voxel column.
 const terrainHeightAt = (x: number, z: number): number =>
-  fractalNoise(
-    x * TERRAIN_NOISE_FREQUENCY,
-    z * TERRAIN_NOISE_FREQUENCY,
-    TERRAIN_NOISE_OCTAVES,
-    TERRAIN_NOISE_LACUNARITY,
-    TERRAIN_NOISE_GAIN,
-  ) * TERRAIN_HEIGHT_SCALE;
+  worldSurfaceHeight(Math.floor(x), Math.floor(z)) + 1;
 
 const GizmoMovement = ({
   controlsRef,
