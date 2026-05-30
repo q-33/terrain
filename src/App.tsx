@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, Suspense } from "react";
+import { useRef, useState, useEffect, Suspense, lazy } from "react";
 import { useThree } from "@react-three/fiber";
 import { Routes, Route, useNavigate } from "react-router-dom";
 import { Canvas } from "@react-three/fiber";
@@ -28,7 +28,21 @@ import SettingsPanel from "./SettingsPanel";
 import Gizmo from "./characters/Gizmo";
 import GizmoModel from "./characters/GizmoModel";
 import GizmoMovement from "./characters/GizmoMovement";
-import CharacterViewer from "./CharacterViewer";
+
+// Lazy so the /characters route doesn't pay for its three-stdlib + GLB loader
+// surface area in the main terrain bundle.
+const CharacterViewer = lazy(() => import("./CharacterViewer"));
+
+// Read once at module load; the overlay is a dev/debug aid, not reactive.
+const debugEnabled =
+  typeof window !== "undefined" &&
+  new URLSearchParams(window.location.search).has("debug");
+
+// Lazy so r3f-perf (~200 kB) is only fetched when ?debug is set, not on every
+// page load.
+const PerfOverlay = lazy(() =>
+  import("r3f-perf").then((m) => ({ default: m.Perf })),
+);
 
 export type CharacterId = "model" | "builtin";
 
@@ -133,10 +147,12 @@ const App = () => {
       <Route
         path="/characters"
         element={
-          <CharacterViewer
-            characterId={characterId}
-            onCharacterChange={setCharacterId}
-          />
+          <Suspense fallback={null}>
+            <CharacterViewer
+              characterId={characterId}
+              onCharacterChange={setCharacterId}
+            />
+          </Suspense>
         }
       />
     </Routes>
@@ -229,6 +245,11 @@ const TerrainView = ({ characterId, onCharacterChange }: TerrainViewProps) => {
         }}
       >
         <AllowContextMenu />
+        {debugEnabled && (
+          <Suspense fallback={null}>
+            <PerfOverlay position="top-left" />
+          </Suspense>
+        )}
         <ambientLight intensity={0.45} />
         <directionalLight position={[60, 80, 40]} intensity={1.6} />
         <hemisphereLight args={["#a8d0e6", "#6b8e4e", 0.5]} />
